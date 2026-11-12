@@ -1,0 +1,165 @@
+/* Dirty Graphix workflow app: design tokens and base components.
+   Source of truth for every screen. Values are taken directly from the approved mockups.
+   Do not introduce new colors, fonts, radii or shadows without updating DESIGN.md. */
+
+@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600;700&display=swap");
+
+:root {
+  /* ---------- Type ---------- */
+  --font-display: "Barlow Condensed", Arial, sans-serif; /* headings, numbers, big buttons, chips on TV */
+  --font-body: "Inter", system-ui, sans-serif;            /* everything else */
+
+  /* ---------- Brand ---------- */
+  --brand: #FF8A1F;          /* Dirty Graphix orange: header rule, score, primary CTA on dark, rush */
+  --brand-ink: #A84C05;      /* orange text on light backgrounds (warnings, "needs attention" meta) */
+  --brand-tint: #FFF8EF;     /* soft orange panel (customer waiting, notes from design, unread rows) */
+  --brand-tint-border: #F5D9B5;
+  --on-color: #141414;       /* text on any bright fill: finish chips, rush tag, orange buttons */
+
+  /* ---------- Office theme (design, team lead, billing, kits) ---------- */
+  --bg: #F4F5F7;
+  --surface: #FFFFFF;
+  --surface-2: #F8F9FA;      /* inset panels, footers, locked phases */
+  --border: #DDE1E6;
+  --border-strong: #C5CBD3;  /* secondary buttons */
+  --border-input: #9AA3AE;   /* inputs, empty checkboxes */
+  --divider: #EEF0F3;        /* row separators, bar tracks */
+  --text: #16181B;
+  --text-2: #3A4047;
+  --muted: #5A626C;
+  --link: #1F6FD1;
+  --link-hover: #1556A6;
+
+  /* ---------- Header bar (every screen) ---------- */
+  --header-bg: #16181B;
+  --header-text: #F2F2F0;
+  --header-muted: #A6ADB5;
+  --header-control-border: #4A515A;
+  --header-rule: 4px solid var(--brand);
+
+  /* ---------- Shop theme (production queue TV, backlog, receive) ---------- */
+  --shop-bg: #0F1113;
+  --shop-surface: #181B1F;
+  --shop-inset: #101215;     /* inputs, bar tracks */
+  --shop-border: #2A2F35;
+  --shop-row: #23272C;
+  --shop-text: #F2F2F0;
+  --shop-text-2: #C9CED4;
+  --shop-muted: #A6ADB5;
+  --shop-dim: #8A929B;
+  --shop-control: #5A616B;
+  --shop-link: #8EC5FF;
+
+  /* ---------- Finish colors (match the shop's colored folders) ---------- */
+  --finish-GL: #34C759;      /* Gloss */
+  --finish-MT: #3B82F6;      /* Matte */
+  --finish-GG: #B57BFF;      /* Gravel Guard */
+  --finish-CG: #E6FF2E;      /* Chrome Gloss */
+  --finish-PR: #FF3DA0;      /* Prismatic */
+  --finish-CM: #14B8A6;      /* Chrome Matte */
+  --finish-CP: #9AA3AE;      /* Chrome Prismatic */
+  --material-WH: #F2F2F0;    /* White print media */
+  --material-CR: #C9CED4;    /* Chrome print media */
+
+  /* ---------- Stage colors (design queue, billing, team lead) ---------- */
+  --stage-reprint: #D93636;
+  --stage-first-proof: #1F6FD1;
+  --stage-revision: #E07B00;
+  --stage-waiting: #8A94A0;  /* waiting on customer, waiting on billing */
+  --stage-print-file: #17803D;
+  --stage-rush: #FF8A1F;
+
+  /* ---------- Kit development phases ---------- */
+  --phase-1: #5B6B7A;        /* Template · Cole */
+  --phase-2: #1F6FD1;        /* Artwork · design */
+  --phase-ty: #FF8A1F;       /* TY check */
+  --phase-3: #17803D;        /* Shopify listing */
+
+  /* ---------- Status ---------- */
+  --success: #17643A;  --success-tint: #E8F7EE;  --success-border: #B9E3C8;
+  --danger: #9B1C1C;   --danger-tint: #FDECEC;   --danger-border: #F3B5B5;
+  --info-tint: #F3F8FE; --info-border: #B9D3F3;
+  --tv-ready: #FF4545;       /* shop TV "Ready" batches */
+
+  /* ---------- Shape ---------- */
+  --radius-chip: 6px;
+  --radius-control: 10px;    /* buttons, inputs */
+  --radius-card: 12px;       /* queue cards, stat cards */
+  --radius-panel: 14px;      /* main detail panels */
+  --radius-pill: 999px;
+  --shadow-selected: 0 2px 8px rgba(22, 24, 27, .12);
+  --shadow-popover: 0 12px 32px rgba(22, 24, 27, .22);
+
+  /* ---------- Size ---------- */
+  --tap: 44px;               /* minimum control height */
+  --tap-primary: 48px;       /* primary actions */
+  --page-max: 1440px;
+  --gutter: 24px;
+  --gap: 20px;
+}
+
+/* ---------- Base ---------- */
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); }
+.theme-shop { background: var(--shop-bg); color: var(--shop-text); }
+.page { max-width: var(--page-max); margin: 0 auto; box-sizing: border-box; padding: 20px var(--gutter) 40px; display: flex; flex-direction: column; gap: var(--gap); }
+
+/* ---------- Header bar ---------- */
+.app-header { background: var(--header-bg); color: var(--header-text); border-bottom: var(--header-rule); }
+.app-header__inner { position: relative; max-width: var(--page-max); margin: 0 auto; box-sizing: border-box; padding: 18px var(--gutter); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+.app-header__brand { font-family: var(--font-display); font-weight: 700; font-size: 16px; letter-spacing: .14em; text-transform: uppercase; color: var(--brand); }
+.app-header__title { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 38px; line-height: 1; letter-spacing: .02em; text-transform: uppercase; }
+.app-header__who { font-size: 14px; color: var(--header-muted); }
+.app-header__who strong { color: var(--header-text); }
+.app-header__btn { min-height: var(--tap); padding: 0 16px; border-radius: var(--radius-control); border: 1px solid var(--header-control-border); background: transparent; color: var(--header-text); font: 600 15px var(--font-body); cursor: pointer; }
+
+/* ---------- Stat card ---------- */
+.stat { background: var(--surface); border: 1px solid var(--border); border-top: 5px solid var(--stat-color, var(--text)); border-radius: var(--radius-card); padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+.stat__label, .stat__note { font-size: 13px; color: var(--muted); }
+.stat__value { font-family: var(--font-display); font-weight: 700; font-size: 34px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+
+/* ---------- Group header (queue sections) ---------- */
+.group-title { margin: 0; display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-weight: 700; font-size: 18px; letter-spacing: .06em; text-transform: uppercase; }
+.group-title__dot { width: 12px; height: 12px; border-radius: 3px; background: var(--group-color); }
+.group-title__count { margin-left: auto; font: 700 13px var(--font-body); padding: 2px 9px; border-radius: var(--radius-pill); color: #FFFFFF; background: var(--group-color); }
+
+/* ---------- Queue card ---------- */
+.q-card { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: var(--radius-card); background: var(--surface); border: 1px solid var(--border); border-left: 6px solid var(--group-color); color: var(--text); text-decoration: none; }
+.q-card[aria-current="true"] { border: 2px solid var(--text); border-left: 6px solid var(--group-color); box-shadow: var(--shadow-selected); }
+.q-card__meta { font-size: 13px; color: var(--muted); }
+.q-card__meta--warn { font-weight: 600; color: var(--brand-ink); }
+
+/* ---------- Finish chip ---------- */
+.chip { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .04em; padding: 3px 8px; border-radius: var(--radius-chip); color: var(--on-color); white-space: nowrap; background: var(--chip-color); }
+.chip--GL { --chip-color: var(--finish-GL); } .chip--MT { --chip-color: var(--finish-MT); }
+.chip--GG { --chip-color: var(--finish-GG); } .chip--CG { --chip-color: var(--finish-CG); }
+.chip--PR { --chip-color: var(--finish-PR); } .chip--CM { --chip-color: var(--finish-CM); }
+.chip--CP { --chip-color: var(--finish-CP); } .chip--WH { --chip-color: var(--material-WH); }
+.chip--CR { --chip-color: var(--material-CR); }
+
+/* ---------- Tags ---------- */
+.tag { font-size: 12px; font-weight: 700; letter-spacing: .06em; padding: 3px 8px; border-radius: var(--radius-chip); white-space: nowrap; }
+.tag--rush { background: var(--stage-rush); color: var(--on-color); }
+.tag--reprint { background: var(--danger-tint); color: var(--danger); border: 1px solid var(--danger-border); }
+.tag--rev { background: #FFF1E3; color: var(--brand-ink); border: 1px solid #F5C08C; }
+
+/* ---------- Buttons ---------- */
+.btn { min-height: var(--tap); padding: 0 14px; border-radius: var(--radius-control); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); font: 600 14px var(--font-body); cursor: pointer; }
+.btn--dark { background: var(--text); border-color: var(--text); color: #FFFFFF; }
+.btn--primary { min-height: var(--tap-primary); padding: 0 22px; border: none; background: var(--link); color: #FFFFFF; font: 700 20px var(--font-display); letter-spacing: .05em; text-transform: uppercase; }
+.btn--primary:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+.btn--cta { min-height: 60px; border: none; border-radius: var(--radius-card); background: var(--brand); color: var(--on-color); font: 700 24px var(--font-display); letter-spacing: .05em; text-transform: uppercase; }
+.btn--link { border: none; background: transparent; color: var(--link); padding: 0 2px; }
+
+/* ---------- Panels ---------- */
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-panel); padding: 24px; display: flex; flex-direction: column; gap: 22px; }
+.panel--accent { border-top: 6px solid var(--panel-color); }
+.section-label { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.shop-panel { background: var(--shop-surface); border: 1px solid var(--shop-border); border-radius: 16px; padding: 24px; }
+
+/* ---------- Inputs ---------- */
+.input { min-height: 48px; box-sizing: border-box; padding: 0 14px; border: 1px solid var(--border-input); border-radius: var(--radius-control); font: 400 15px var(--font-body); background: var(--surface); color: var(--text); }
+.input--number { font-size: 20px; font-variant-numeric: tabular-nums; }
+
+/* ---------- Progress bar ---------- */
+.bar { display: block; height: 8px; border-radius: var(--radius-pill); background: var(--divider); overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--bar-color); }

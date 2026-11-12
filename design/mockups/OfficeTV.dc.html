@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Design team score</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#0F1113}
+a{color:#8EC5FF}a:hover{color:#B9DBFF}
+</style>
+</helmet>
+<main style="min-height: 100vh; box-sizing: border-box; background: #0F1113; color: #F2F2F0; font-family: Inter, system-ui, sans-serif; padding: 32px 24px 40px">
+<div style="max-width: 1440px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px">
+
+<header style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 18px; letter-spacing: 0.14em; text-transform: uppercase; color: #FF8A1F">Dirty Graphix</span>
+<h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 56px; line-height: 1; letter-spacing: 0.02em; text-transform: uppercase">Design team</h1>
+</div>
+<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 26px">Thu, Nov 5 · 8:14 AM</span>
+<span style="font-size: 13px; color: #A6ADB5; border: 1px solid #3A4048; border-radius: 6px; padding: 3px 8px">Sample data · targets set after the baseline month</span>
+</div>
+</header>
+
+<section aria-label="Team design score" style="display: flex; flex-wrap: wrap; gap: 16px">
+
+<div style="flex: 1 1 320px; background: #181B1F; border: 1px solid #2A2F35; border-radius: 16px; padding: 28px; display: flex; flex-direction: column; justify-content: center; gap: 8px">
+<span style="font-size: 16px; color: #A6ADB5">Team score · rolling 4 weeks</span>
+<div style="display: flex; align-items: baseline; gap: 10px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 168px; line-height: 0.85; font-variant-numeric: tabular-nums; color: #4DA3FF">89</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 40px; color: #8A929B">/ 100</span>
+</div>
+<span style="font-size: 18px; font-weight: 600; color: #F2F2F0">Up 3 from last week</span>
+</div>
+
+<div style="flex: 999 1 560px; min-width: 0; background: #181B1F; border: 1px solid #2A2F35; border-radius: 16px; padding: 24px 28px; display: flex; flex-direction: column; gap: 18px">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 24px; letter-spacing: 0.04em; text-transform: uppercase">Where the points come from</h2>
+<sc-for list="{{measures}}" as="m" hint-placeholder-count="4">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap">
+<span style="font-size: 19px; font-weight: 600">{{m.label}}</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 28px; font-variant-numeric: tabular-nums">{{m.pts}}</span>
+</div>
+<div role="img" aria-label="{{m.barLabel}}" style="{{m.trackStyle}}">
+<div style="{{m.fillStyle}}"></div>
+</div>
+<span style="font-size: 15px; color: #A6ADB5">{{m.note}}</span>
+</div>
+</sc-for>
+</div>
+
+</section>
+
+<section aria-label="Right now" style="background: #181B1F; border: 1px solid #2A2F35; border-radius: 14px; padding: 18px 20px; display: flex; flex-wrap: wrap; gap: 28px; align-items: baseline">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 24px; letter-spacing: 0.04em; text-transform: uppercase">Right now</h2>
+<span style="font-size: 17px; color: #C9CED4"><strong style="font-family: 'Barlow Condensed', sans-serif; font-size: 30px; color: #F2F2F0">18</strong> in design</span>
+<span style="font-size: 17px; color: #C9CED4"><strong style="font-family: 'Barlow Condensed', sans-serif; font-size: 30px; color: #F2F2F0">7</strong> proofs out with customers</span>
+<span style="font-size: 17px; color: #C9CED4"><strong style="font-family: 'Barlow Condensed', sans-serif; font-size: 30px; color: #F2F2F0">3</strong> approved, waiting on hand-off</span>
+<span style="font-size: 17px; color: #C9CED4"><strong style="font-family: 'Barlow Condensed', sans-serif; font-size: 30px; color: #FF8A1F">1</strong> rush in design</span>
+<span style="font-size: 17px; color: #C9CED4"><strong style="font-family: 'Barlow Condensed', sans-serif; font-size: 30px; color: #F2F2F0">38</strong> handed off this week</span>
+</section>
+
+</div>
+</main>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1040}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var track = "height:18px;border-radius:999px;background:#101215;border:1px solid #2A2F35;overflow:hidden;";
+    var measures = [
+      { label: "Design-caused reprints", got: 41, max: 45, note: "1.8 per 100 orders" },
+      { label: "Revisions per order", got: 4, max: 5, note: "Team avg 1.5" },
+      { label: "Order to first proof", got: 13, max: 15, note: "Team avg 5h 16m" },
+      { label: "Revision turnaround", got: 9, max: 10, note: "Team avg 2h 07m" },
+      { label: "Print file on time", got: 9, max: 10, note: "94% on time" },
+      { label: "Output", got: 13, max: 15, note: "Orders per business day worked" }
+    ].map(function (m) {
+      var pct = m.got / m.max * 100;
+      return {
+        label: m.label,
+        pts: m.got + " / " + m.max,
+        note: m.note,
+        barLabel: m.label + ": " + m.got + " of " + m.max + " points",
+        trackStyle: track,
+        fillStyle: "height:100%;border-radius:999px;background:#4DA3FF;width:" + pct.toFixed(1) + "%;"
+      };
+    });
+    return { measures: measures };
+  }
+}
+</script>
+</body>
+</html>

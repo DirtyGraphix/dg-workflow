@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>New kits</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#F4F5F7}
+a{color:#1F6FD1}a:hover{color:#1556A6}
+</style>
+</helmet>
+<main style="min-height: 100vh; box-sizing: border-box; background: #F4F5F7; color: #16181B; font-family: Inter, system-ui, sans-serif; padding: 0 0 40px">
+<header style="background: #16181B; color: #F2F2F0; border-bottom: 4px solid #FF8A1F">
+<div style="max-width: 1440px; margin: 0 auto; box-sizing: border-box; padding: 18px 24px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px">
+<div style="display: flex; align-items: baseline; gap: 14px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 16px; letter-spacing: 0.14em; text-transform: uppercase; color: #FF8A1F">Dirty Graphix</span>
+<h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 38px; line-height: 1; letter-spacing: 0.02em; text-transform: uppercase">New kits</h1>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<span style="font-size: 14px; color: #A6ADB5">Signed in as <strong style="color: #F2F2F0">TY</strong> · Mon, Nov 9 · sample data</span>
+<button type="button" style="min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid #4A515A; background: transparent; color: #F2F2F0; font-weight: 600; font-size: 15px; cursor: pointer">Start a kit without an order</button>
+</div>
+</div>
+</header>
+<div style="max-width: 1440px; margin: 0 auto; box-sizing: border-box; padding: 20px 24px 0; display: flex; flex-direction: column; gap: 22px">
+
+<section aria-label="Kit numbers" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px">
+<sc-for list="{{stats}}" as="s" hint-placeholder-count="4">
+<div style="{{s.style}}">
+<span style="font-size: 13px; color: #5A626C">{{s.label}}</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 34px; line-height: 1.1; font-variant-numeric: tabular-nums">{{s.value}}</span>
+<span style="font-size: 13px; color: #5A626C">{{s.note}}</span>
+</div>
+</sc-for>
+</section>
+
+<section aria-label="Kits by phase" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 14px; align-items: start">
+<sc-for list="{{lanes}}" as="l" hint-placeholder-count="4">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<h2 style="margin: 0; display: flex; align-items: center; gap: 8px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 19px; letter-spacing: 0.05em; text-transform: uppercase"><span aria-hidden="true" style="{{l.dotStyle}}"></span>{{l.title}} <span style="{{l.countStyle}}">{{l.count}}</span></h2>
+<span style="font-size: 13px; color: #5A626C; margin-top: -4px">{{l.who}}</span>
+<sc-for list="{{l.cards}}" as="k" hint-placeholder-count="2">
+<a href="#kit" style="{{k.cardStyle}}">
+<span style="display: flex; justify-content: space-between; align-items: center; gap: 8px">
+<span style="font-weight: 700; font-size: 16px">{{k.machine}}</span>
+<span style="font-size: 13px; font-weight: 600; color: #5A626C; white-space: nowrap; font-variant-numeric: tabular-nums">{{k.age}}</span>
+</span>
+<span style="{{k.orderStyle}}">{{k.order}}</span>
+<span aria-hidden="true" style="display: block; height: 8px; border-radius: 999px; background: #EEF0F3; overflow: hidden"><span style="{{k.barStyle}}"></span></span>
+<span style="font-size: 13px; color: #3A4047">{{k.next}}</span>
+</a>
+</sc-for>
+</div>
+</sc-for>
+</section>
+
+<section id="kit" aria-label="Kit detail" style="background: #FFFFFF; border: 1px solid #DDE1E6; border-top: 6px solid #1F6FD1; border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 20px">
+
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; align-items: flex-start">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 14px; color: #5A626C">Started Mon, Nov 2 · 7 business days in kit development</span>
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 38px; line-height: 1; text-transform: uppercase">CAT 255 · new kit</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px">
+<span style="{{phasePillStyle}}">{{phasePill}}</span>
+<span style="font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: #F0F2F5; color: #3A4047; border: 1px solid #DDE1E6">Regular size</span>
+<a href="#kit" style="font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: #EEF5FE; color: #1556A6; border: 1px solid #B9D3F3; text-decoration: none">Equipment folder · CAT 255</a>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; border-radius: 12px; background: #FFF8EF; border: 1px solid #F5D9B5; max-width: 460px">
+<span style="font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #A84C05">Customer order waiting on this kit</span>
+<span style="font-size: 15px"><strong>D-1043</strong> (draft order) · [Customer name] · assigned to Andrew</span>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 12px">
+<sc-for list="{{milestones}}" as="m" hint-placeholder-count="2">
+<div style="{{m.boxStyle}}">
+<span aria-hidden="true" style="{{m.iconStyle}}">{{m.icon}}</span>
+<div style="display: flex; flex-direction: column; gap: 4px; min-width: 0">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; letter-spacing: 0.03em; text-transform: uppercase">{{m.title}}</span>
+<span style="font-size: 14px; color: #16181B">{{m.result}}</span>
+<span style="font-size: 13px; color: #3A4047">{{m.needs}}</span>
+</div>
+</div>
+</sc-for>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 14px; align-items: start">
+<sc-for list="{{phases}}" as="p" hint-placeholder-count="4">
+<div style="{{p.boxStyle}}">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px">
+<h3 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 21px; letter-spacing: 0.04em; text-transform: uppercase">{{p.title}}</h3>
+<span style="font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; color: #3A4047">{{p.progress}}</span>
+</div>
+<span aria-hidden="true" style="display: block; height: 6px; border-radius: 999px; background: #EEF0F3; overflow: hidden"><span style="{{p.barStyle}}"></span></span>
+<span style="font-size: 13px; color: #5A626C">{{p.status}}</span>
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{p.steps}}" as="s" hint-placeholder-count="5">
+<button type="button" role="checkbox" aria-checked="{{s.checked}}" aria-disabled="{{s.disabled}}" onClick="{{s.toggle}}" style="{{s.rowStyle}}">
+<span aria-hidden="true" style="{{s.boxStyle}}">{{s.mark}}</span>
+<span style="display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1">
+<span style="{{s.textStyle}}">{{s.text}}</span>
+<span style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px">
+<span style="{{s.ownerStyle}}">{{s.owner}}</span>
+<span style="font-size: 12px; color: #5A626C">{{s.meta}}</span>
+</span>
+</span>
+</button>
+</sc-for>
+</div>
+</div>
+</sc-for>
+</div>
+
+<span style="font-size: 13px; color: #3A4047">Each step can only be checked off by its owner (or TY). Steps can be done in any order, except the Shopify listing steps, which wait for TY check. When Phases 1 and 2 are complete, the kit moves to TY's list automatically. Pricing steps and amounts only show for TY and Nikki.</span>
+</section>
+
+</div>
+</main>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1500}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var self = this;
+    var st = this.state || {};
+    var done = st.done || {};
+
+    var C = { p1: "#5B6B7A", p2: "#1F6FD1", ty: "#FF8A1F", p3: "#17803D" };
+
+    var statBase = "background:#FFFFFF;border:1px solid #DDE1E6;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:2px;border-top:5px solid ";
+    var stats = [
+      { label: "Kits in development", value: "5", note: "3 customers waiting on a mockup", c: "#16181B" },
+      { label: "Waiting on you", value: "1", note: "Bobcat T86 · TY check", c: "#FF8A1F" },
+      { label: "Order to template", value: "9 days", note: "Avg, last 90 days", c: "#5B6B7A" },
+      { label: "Longest open", value: "34 days", note: "Takeuchi TL12R2", c: "#D93636" }
+    ].map(function (s) { s.style = statBase + s.c + ";"; return s; });
+
+    var cardBase = "display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:12px;text-decoration:none;color:#16181B;background:#FFFFFF;";
+    var kc = function (lane, machine, order, waiting, age, n, of, next, sel) {
+      return { machine: machine, order: order, age: age, next: next,
+        orderStyle: "font-size:13px;" + (waiting ? "font-weight:600;color:#A84C05;" : "color:#5A626C;"),
+        barStyle: "display:block;height:100%;width:" + Math.round(n / of * 100) + "%;background:" + C[lane] + ";",
+        cardStyle: cardBase + (sel ? "border:2px solid #16181B;box-shadow:0 2px 8px rgba(22,24,27,.12);" : "border:1px solid #DDE1E6;") + "border-left:6px solid " + C[lane] + ";" };
+    };
+    var lanes = [
+      { key: "p1", title: "Phase 1 · Template", who: "Cole locates the machine, templates and scans · Andrew traces", cards: [
+        kc("p1", "John Deere 333 P-Tier", "D-1051 · customer waiting", true, "2 days", 0, 6, "Next: Cole · locating the machine", false),
+        kc("p1", "Kubota SVL97-2", "#4831 · customer waiting", true, "6 days", 4, 6, "Next: Cole · upload scans", false)
+      ] },
+      { key: "p2", title: "Phase 2 · Artwork", who: "Cierra lays out · Alissa applies design", cards: [
+        kc("p2", "CAT 255", "D-1043 · mockup ready · released to Andrew", false, "7 days", 2, 4, "Next: Andrew · trace / offset", true)
+      ] },
+      { key: "ty", title: "TY check", who: "Approve and price", cards: [
+        kc("ty", "Bobcat T86", "#4819 · customer waiting", true, "12 days", 0, 2, "Next: TY · approve phase 1 and 2", false)
+      ] },
+      { key: "p3", title: "Phase 3 · Shopify listing", who: "Alissa · Tara · Nikki", cards: [
+        kc("p3", "Takeuchi TL12R2", "Order released to Alissa", false, "34 days", 5, 9, "Next: Nikki · add pricing", false)
+      ] }
+    ].map(function (l) {
+      return { title: l.title, who: l.who, cards: l.cards, count: String(l.cards.length),
+        dotStyle: "display:inline-block;width:12px;height:12px;border-radius:3px;background:" + C[l.key] + ";",
+        countStyle: "margin-left:auto;font-family:Inter,sans-serif;font-size:13px;font-weight:700;padding:2px 9px;border-radius:999px;color:#FFFFFF;background:" + C[l.key] + ";" };
+    });
+
+    var defs = [
+      { key: "p1", title: "Phase 1 · Template", steps: [
+        ["a1", "Take profile pics, upload to a new folder in Equipment", "Cole", "Mon, Nov 2"],
+        ["a2", "Template", "Cole", "Tue, Nov 3"],
+        ["a3", "Upload template pics", "Cole", "Tue, Nov 3"],
+        ["a4", "Scan", "Cole", "Wed, Nov 4"],
+        ["a5", "Upload scans to the machine's Equipment folder", "Cole", "Wed, Nov 4"],
+        ["a6", "Trace / offset", "Andrew", null]
+      ] },
+      { key: "p2", title: "Phase 2 · Artwork", steps: [
+        ["b1", "Layout for print", "Cierra", null],
+        ["b2", "Delete background and outline", "Cierra", "Thu, Nov 5"],
+        ["b3", "Add depth layer", "Cierra", "Fri, Nov 6"],
+        ["b4", "Apply design", "Alissa", null]
+      ] },
+      { key: "ty", title: "TY check", steps: [
+        ["c1", "Approve phase 1 and 2 work", "TY", null],
+        ["c2", "Price kit", "TY", null]
+      ] },
+      { key: "p3", title: "Phase 3 · Shopify listing", steps: [
+        ["d1", "Save as web images", "Alissa", "Fri, Nov 6"],
+        ["d2", "Add to Shopify", "Tara", null],
+        ["d3", "Apply customization option sets", "Tara", null],
+        ["d4", "Create collections if new brand or type", "Tara", null],
+        ["d5", "Upload images", "Nikki", null],
+        ["d6", "Add pricing in Shopify · +$450 regular custom one-off, +$300 mini/small", "Nikki", null],
+        ["d7", "Set product as active", "Nikki", null],
+        ["d8", "Add to menu if new brand or equipment type (or assign to Tara)", "Nikki", null],
+        ["d9", "Done · all checklists complete", "Nikki", null]
+      ] }
+    ];
+    var isDone = function (s) { return done[s[0]] !== undefined ? done[s[0]] : !!s[3]; };
+    var byId = {};
+    defs.forEach(function (p) { p.steps.forEach(function (s) { byId[s[0]] = s; }); });
+    var D = function (id) { return isDone(byId[id]); };
+    var allDone = function (p) { return p.steps.every(isDone); };
+    var p12 = allDone(defs[0]) && allDone(defs[1]);
+    var tyOk = allDone(defs[2]);
+    var KEY = { b3: 1, d1: 1, a6: 1, b1: 1 };
+
+    var current = null;
+    var phases = defs.map(function (p) {
+      var n = p.steps.filter(isDone).length;
+      var complete = n === p.steps.length;
+      var unlocked = p.key === "ty" ? p12 : true;
+      if (!complete && !current) { current = p; }
+      var steps = p.steps.map(function (s) {
+        var d = isDone(s);
+        var dis = p.key === "ty" ? !p12 : (p.key === "p3" && s[0] !== "d1" ? !tyOk : false);
+        var mine = s[2] === "TY";
+        return {
+          text: s[1], owner: mine ? "You" : s[2], checked: d ? "true" : "false", disabled: dis ? "true" : "false",
+          mark: d ? "✓" : "",
+          meta: (d ? "Done · " + (s[3] || "today") : (dis ? "" : "To do")) + (KEY[s[0]] ? (s[0] === "b3" || s[0] === "d1" ? " · needed for mockup" : " · needed for print file") : ""),
+          rowStyle: "display:flex;align-items:flex-start;gap:10px;padding:9px 0;border:none;border-top:1px solid #EEF0F3;background:transparent;text-align:left;font-family:Inter,sans-serif;color:#16181B;width:100%;" + (dis ? "cursor:default;opacity:.5;" : "cursor:pointer;"),
+          boxStyle: "flex:0 0 22px;width:22px;height:22px;box-sizing:border-box;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;margin-top:1px;" + (d ? "background:" + C[p.key] + ";color:#FFFFFF;border:none;" : "background:#FFFFFF;border:2px solid #9AA3AE;color:transparent;"),
+          textStyle: "font-size:14px;line-height:1.35;" + (d ? "color:#5A626C;" : "font-weight:600;"),
+          ownerStyle: "font-size:12px;font-weight:700;padding:1px 7px;border-radius:999px;" + (mine ? "background:#FF8A1F;color:#141414;" : "background:#F0F2F5;color:#3A4047;"),
+          toggle: function () { if (dis) { return; } var nd = Object.assign({}, done); nd[s[0]] = !d; self.setState({ done: nd }); }
+        };
+      });
+      var status = complete ? "Complete" : (p.key === "ty" && !p12 ? "Opens when Phases 1 and 2 are complete" : (p.key === "p3" && !tyOk ? "Web images can start now · listing steps wait for TY check" : "In progress"));
+      return {
+        title: p.title, steps: steps, status: status,
+        progress: n + " / " + p.steps.length,
+        barStyle: "display:block;height:100%;width:" + Math.round(n / p.steps.length * 100) + "%;background:" + C[p.key] + ";",
+        boxStyle: "display:flex;flex-direction:column;gap:8px;padding:14px 16px;border-radius:12px;border:1px solid #DDE1E6;border-top:6px solid " + C[p.key] + ";" + (unlocked ? "background:#FFFFFF;" : "background:#F8F9FA;")
+      };
+    });
+
+    var ms = function (title, ok, c, yes, no, needs) {
+      var missing = needs.filter(function (n) { return !D(n[0]); }).map(function (n) { return n[1]; });
+      return {
+        title: title, icon: ok ? "✓" : "",
+        result: ok ? yes : no,
+        needs: ok ? "" : "Still needed: " + missing.join(" · "),
+        boxStyle: "display:flex;gap:14px;align-items:flex-start;padding:14px 16px;border-radius:12px;" + (ok ? "background:#E8F7EE;border:1px solid #B9E3C8;border-left:8px solid #17803D;" : "background:#FFFFFF;border:1px solid #DDE1E6;border-left:8px solid " + c + ";"),
+        iconStyle: "flex:0 0 32px;width:32px;height:32px;box-sizing:border-box;border-radius:999px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;" + (ok ? "background:#17803D;color:#FFFFFF;" : "border:3px solid " + c + ";color:transparent;")
+      };
+    };
+    var milestones = [
+      ms("1 · Mockup ready", D("b3") && D("d1"), "#1F6FD1",
+        "Released to Andrew. The order is in his Needs first proof and the design clock is running.",
+        "When this is done, the order releases to Andrew's Needs first proof so he can start designing with the customer.",
+        [["b3", "depth layer (Cierra)"], ["d1", "web images (Alissa)"]]),
+      ms("2 · Template ready", D("a6") && D("b1"), "#5B6B7A",
+        "Print file unlocked. Andrew can hand the order off to production.",
+        "Andrew can proof with the customer before this, but the print file and hand-off stay locked until it's done.",
+        [["a6", "trace / offset (Andrew)"], ["b1", "layout for print (Cierra)"]])
+    ];
+    var phasePill = current ? "In " + current.title : "Kit complete";
+    var pc = current ? C[current.key] : "#17803D";
+    return {
+      stats: stats, lanes: lanes, phases: phases, milestones: milestones,
+      phasePill: phasePill,
+      phasePillStyle: "font-size:13px;font-weight:700;padding:4px 10px;border-radius:999px;color:" + (current && current.key === "ty" ? "#141414" : "#FFFFFF") + ";background:" + pc + ";"
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Production queue</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#0F1113}
+a{color:#8EC5FF}a:hover{color:#B9DBFF}
+</style>
+</helmet>
+<main style="min-height: 100vh; box-sizing: border-box; background: #0F1113; color: #F2F2F0; font-family: Inter, system-ui, sans-serif; padding: 32px 24px 40px">
+<div style="max-width: 1440px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px">
+
+<header style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 18px; letter-spacing: 0.14em; text-transform: uppercase; color: #FF8A1F">Dirty Graphix</span>
+<h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 56px; line-height: 1; letter-spacing: 0.02em; text-transform: uppercase">Production queue</h1>
+</div>
+<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 28px; font-variant-numeric: tabular-nums">Thu, Nov 5 · 8:14 AM</span>
+<span style="font-size: 13px; color: #A6ADB5; border: 1px solid #3A4048; border-radius: 6px; padding: 3px 8px">Sample data for layout review</span>
+</div>
+</header>
+
+<section aria-label="Queue summary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px">
+<sc-for list="{{stats}}" as="s" hint-placeholder-count="5">
+<div style="background: #181B1F; border: 1px solid #2A2F35; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 14px; color: #A6ADB5">{{s.label}}</span>
+<span style="{{s.style}}">{{s.value}}</span>
+</div>
+</sc-for>
+</section>
+
+<section aria-label="Print lanes by finish, most urgent first" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px">
+<sc-for list="{{lanes}}" as="lane" hint-placeholder-count="6">
+<article style="{{lane.cardStyle}}">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap">
+<div style="display: flex; align-items: center; gap: 12px; min-width: 0">
+<span style="{{lane.badgeStyle}}">{{lane.code}}</span>
+<div style="display: flex; flex-direction: column; min-width: 0">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 30px; letter-spacing: 0.02em; text-transform: uppercase; white-space: nowrap">{{lane.name}}</h2>
+<span style="font-size: 14px; color: #A6ADB5">{{lane.combo}}</span>
+</div>
+</div>
+<span style="{{lane.pillStyle}}">{{lane.status}}</span>
+</div>
+
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 12px">
+<span style="{{lane.fillStyle}}">{{lane.fill}}</span>
+<span style="font-size: 15px; color: #A6ADB5; text-align: right">{{lane.fillNote}}</span>
+</div>
+
+<div role="img" aria-label="{{lane.barLabel}}" style="display: flex; height: 36px; border-radius: 8px; overflow: hidden; background: #101215; border: 1px solid #2A2F35">
+<sc-for list="{{lane.segments}}" as="seg" hint-placeholder-count="3">
+<div style="{{seg.style}}">{{seg.label}}</div>
+</sc-for>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 4px; font-size: 15px">
+<span style="font-weight: 600; color: #F2F2F0">{{lane.media}}</span>
+<span style="font-weight: 600; color: #F2F2F0">{{lane.lam}}</span>
+<span style="color: #A6ADB5">{{lane.leftover}}</span>
+</div>
+
+<sc-if value="{{lane.hasJobs}}" hint-placeholder-val="{{true}}">
+<ol style="list-style: none; margin: 0; padding: 0; border-top: 1px solid #2A2F35">
+<sc-for list="{{lane.jobs}}" as="job" hint-placeholder-count="3">
+<li style="display: grid; grid-template-columns: 28px 60px minmax(0, 1fr) auto 34px 76px; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid #23272C; font-size: 16px">
+<span style="color: #8A929B; font-variant-numeric: tabular-nums">{{job.seq}}</span>
+<span style="font-weight: 600; font-variant-numeric: tabular-nums">{{job.order}}</span>
+<span style="color: #C9CED4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{job.machine}}</span>
+<span style="{{job.tagStyle}}">{{job.tag}}</span>
+<span style="color: #A6ADB5; font-variant-numeric: tabular-nums; text-align: right">{{job.age}}</span>
+<span style="font-variant-numeric: tabular-nums; text-align: right; font-weight: 600">{{job.len}}</span>
+</li>
+</sc-for>
+</ol>
+</sc-if>
+
+<sc-if value="{{lane.isEmpty}}" hint-placeholder-val="{{false}}">
+<p style="margin: 0; padding: 20px 0; border-top: 1px solid #2A2F35; color: #A6ADB5; font-size: 16px">No print-ready jobs in this finish.</p>
+</sc-if>
+
+<div style="margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap">
+<span style="font-size: 14px; color: #A6ADB5">{{lane.footer}}</span>
+<sc-if value="{{lane.hasButton}}" hint-placeholder-val="{{true}}">
+<button type="button" style="{{lane.btnStyle}}">{{lane.btn}}</button>
+</sc-if>
+</div>
+</article>
+</sc-for>
+</section>
+
+<section aria-label="Material on hand" style="background: #181B1F; border: 1px solid #2A2F35; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 24px; letter-spacing: 0.04em; text-transform: uppercase">Material · days of supply</h2>
+<span style="font-size: 14px; color: #A6ADB5">Reorder alert under 15 business days · supplier lead time 7–10</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 12px">
+<sc-for list="{{material}}" as="m" hint-placeholder-count="6">
+<div style="{{m.boxStyle}}">
+<span style="display: flex; align-items: center; gap: 8px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 16px; letter-spacing: 0.06em; color: #C9CED4"><span style="{{m.chipStyle}}">{{m.code}}</span>{{m.name}}</span>
+<span style="{{m.valueStyle}}">{{m.days}}</span>
+<span style="{{m.noteStyle}}">{{m.note}}</span>
+</div>
+</sc-for>
+</div>
+</section>
+
+</div>
+</main>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2160}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var cond = "font-family:'Barlow Condensed',sans-serif;font-weight:700;";
+    var pillBase = cond + "font-size:17px;letter-spacing:.06em;text-transform:uppercase;padding:6px 12px;border-radius:999px;white-space:nowrap;";
+    var pill = {
+      rush: "background:#FF8A1F;color:#141414;border:1px solid #FF8A1F;",
+      ready: "background:#FF4545;color:#141414;border:1px solid #FF4545;",
+      hold: "background:transparent;color:#E4E7EA;border:1px solid #5A616B;",
+      empty: "background:transparent;color:#A6ADB5;border:1px solid #3A4048;"
+    };
+    var fillColor = { rush: "#FF8A1F", ready: "#FF4545", hold: "#A6ADB5", empty: "#8A929B" };
+    var finishColor = { GL: "#34C759", MT: "#3B82F6", GG: "#B57BFF", CG: "#E6FF2E", PR: "#FF3DA0", CM: "#14B8A6", CP: "#9AA3AE", WH: "#F2F2F0", CR: "#C9CED4" };
+    var cardBase = "background:#181B1F;border:1px solid #2A2F35;border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:16px;min-width:0;";
+    var badgeBase = cond + "font-size:18px;letter-spacing:.06em;padding:3px 9px;border-radius:6px;color:#141414;";
+    var segBase = "display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;overflow:hidden;white-space:nowrap;border-right:2px solid #101215;box-sizing:border-box;min-width:0;color:#141414;";
+    var leftoverStyle = "flex:1 1 auto;min-width:0;background:repeating-linear-gradient(135deg,#15181B 0 6px,#1F2328 6px 12px);";
+    var btnBase = "min-height:48px;padding:0 20px;border-radius:10px;cursor:pointer;" + cond + "font-size:19px;letter-spacing:.05em;text-transform:uppercase;";
+    var btn = {
+      rush: "background:#FF8A1F;color:#141414;border:none;",
+      ready: "background:#FF4545;color:#141414;border:none;",
+      hold: "background:transparent;color:#E4E7EA;border:1px solid #5A616B;"
+    };
+    var tagBase = "font-size:12px;font-weight:700;letter-spacing:.06em;padding:3px 8px;border-radius:6px;white-space:nowrap;";
+    var tagStyle = {
+      "RUSH": tagBase + "background:#FF8A1F;color:#141414;",
+      "GAP FILL": tagBase + "border:1px solid #8A929B;color:#E4E7EA;",
+      "": ""
+    };
+    var n = function (x) { return x.toLocaleString("en-US"); };
+
+    var raw = [
+      { code: "GG", name: "Gravel Guard", combo: "White print + Gravel Guard laminate", kind: "rush", status: "Rush · print now", avail: 802,
+        media: "Print: WH-R0144 · new roll · 1,704 in", lam: "Laminate: GG-007 · remnant · 802 in",
+        leftover: "Left over: print 1,020 in → WH-015 · laminate 118 in → GG-009",
+        note: "of 802 in · 1 cut section · laminate is the shorter roll",
+        jobs: [
+          { order: 4821, machine: "CAT 299D3", len: 412, age: 0, tag: "RUSH", sec: 1 },
+          { order: 4807, machine: "Bobcat T770", len: 268, age: 3, tag: "GAP FILL", sec: 1 }
+        ],
+        footer: "Rush prints now, under 95% fill", btn: "Start batch · 2 tickets" },
+      { code: "GL", name: "Gloss", combo: "White print + Gloss laminate", kind: "ready", status: "Ready · 95%+", avail: 1704,
+        media: "Print: WH-R0145 · new roll · 1,704 in", lam: "Laminate: GL-R0141 · new roll · 1,704 in",
+        leftover: "Left over: 34 in on each · counted as waste",
+        note: "of 1,704 in · 2 cut sections: A 934 in, B 724 in",
+        jobs: [
+          { order: 4798, machine: "Kubota SVL75-3", len: 620, age: 4, tag: "", sec: 1 },
+          { order: 4811, machine: "Bobcat S650", len: 310, age: 2, tag: "GAP FILL", sec: 1 },
+          { order: 4802, machine: "CAT 262D3", len: 540, age: 4, tag: "", sec: 2 },
+          { order: 4815, machine: "John Deere 333G", len: 180, age: 1, tag: "GAP FILL", sec: 2 }
+        ],
+        footer: "+2 waiting for the next Gloss roll", btn: "Start batch · 4 tickets" },
+      { code: "CG", name: "Chrome Gloss", combo: "Chrome print + Gloss laminate", kind: "ready", status: "Ready · 95%+", avail: 640,
+        media: "Print: CR-004 · remnant · 640 in", lam: "Laminate: GL-011 · remnant · 702 in",
+        leftover: "Left over: print 24 in, waste · laminate 86 in → GL-012",
+        note: "of 640 in · 1 cut section · print remnant is the shorter roll",
+        jobs: [
+          { order: 4812, machine: "Bobcat E35", len: 318, age: 2, tag: "", sec: 1 },
+          { order: 4816, machine: "Kubota KX040-4", len: 294, age: 1, tag: "", sec: 1 }
+        ],
+        footer: "Uses up print remnant CR-004", btn: "Start batch · 2 tickets" },
+      { code: "MT", name: "Matte", combo: "White print + Matte laminate", kind: "hold", status: "Holding · 4 days", avail: 1704,
+        media: "Plan print: WH new roll · 1,704 in", lam: "Plan laminate: MT-R0090 · new roll · 1,704 in", leftover: "664 in open",
+        note: "of 1,704 in · forces print Wed, Nov 11",
+        jobs: [
+          { order: 4790, machine: "CAT 308 CR", len: 744, age: 3, tag: "", sec: 1 },
+          { order: 4809, machine: "Takeuchi TL10V2", len: 292, age: 2, tag: "", sec: 1 }
+        ],
+        footer: "Waiting for jobs to fill the roll", btn: "Print now anyway" },
+      { code: "PR", name: "Prismatic", combo: "White print + Prismatic laminate", kind: "hold", status: "Holding · 6 days", avail: 1704,
+        media: "Plan print: WH new roll · 1,704 in", lam: "Plan laminate: PR-R0030 · new roll · 864 in", leftover: "1,060 in open",
+        note: "of 1,704 in · forces print Fri, Nov 13",
+        jobs: [
+          { order: 4819, machine: "CAT 259D3", len: 642, age: 1, tag: "", sec: 1 }
+        ],
+        footer: "Waiting for jobs to fill the roll", btn: "Print now anyway" },
+      { code: "CM", name: "Chrome Matte", combo: "Chrome print + Matte laminate", kind: "empty", status: "Empty", avail: 802,
+        media: "On the shelf: CR-006 · remnant · 802 in", lam: "On the shelf: MT-003 · remnant · 410 in", leftover: "",
+        note: "nothing queued",
+        jobs: [],
+        footer: "Next Chrome Matte job plans against these remnants", btn: "" },
+      { code: "CP", name: "Chrome Prismatic", combo: "Chrome print + Prismatic laminate", kind: "empty", status: "Empty", avail: 1704,
+        media: "Next: CR-R0039 · new roll", lam: "Next: PR-005 · remnant · 520 in", leftover: "",
+        note: "nothing queued",
+        jobs: [],
+        footer: "Next Chrome Prismatic job plans against PR-005", btn: "" }
+    ];
+
+    var GAP = 12;
+    var cutStyle = "background:#101215;border-left:2px dashed #F2F2F0;border-right:2px dashed #F2F2F0;box-sizing:border-box;min-width:8px;";
+    var lanes = raw.map(function (l) {
+      var hasB = l.jobs.some(function (j) { return j.sec === 2; });
+      var used = l.jobs.reduce(function (a, j) { return a + j.len + 3; }, 0) + (hasB ? GAP : 0);
+      var pct = used / l.avail * 100;
+      var segments = [];
+      l.jobs.forEach(function (j, i) {
+        if (j.sec === 2 && (i === 0 || l.jobs[i - 1].sec !== 2)) {
+          segments.push({ label: "", style: cutStyle + "flex:0 0 " + Math.max(GAP / l.avail * 100, 0.8).toFixed(2) + "%;" });
+        }
+        var w = (j.len + 3) / l.avail * 100;
+        var bg = j.tag === "RUSH" ? "#FF8A1F" : finishColor[l.code];
+        segments.push({ label: w >= 11 ? "#" + j.order : "", style: segBase + "background:" + bg + ";flex:0 0 " + w.toFixed(2) + "%;" });
+      });
+      segments.push({ label: "", style: leftoverStyle });
+      return {
+        cardStyle: cardBase + "border-top:10px solid " + finishColor[l.code] + ";",
+        badgeStyle: badgeBase + "background:" + finishColor[l.code] + ";",
+        code: l.code,
+        name: l.name,
+        status: l.status,
+        pillStyle: pillBase + pill[l.kind],
+        fill: l.jobs.length ? pct.toFixed(1) + "%" : "—",
+        fillStyle: cond + "font-size:48px;line-height:1;font-variant-numeric:tabular-nums;color:" + fillColor[l.kind] + ";",
+        fillNote: l.note,
+        barLabel: l.jobs.length ? l.name + " roll " + pct.toFixed(1) + " percent planned" : l.name + " roll empty",
+        segments: segments,
+        combo: l.combo,
+        media: l.media,
+        lam: l.lam,
+        leftover: l.leftover,
+        hasJobs: l.jobs.length > 0,
+        isEmpty: l.jobs.length === 0,
+        jobs: l.jobs.map(function (j, i) {
+          return { seq: (j.sec === 2 ? "B" : "A") + l.jobs.filter(function (k, x) { return x <= i && k.sec === j.sec; }).length, order: "#" + j.order, machine: j.machine, tag: j.tag, tagStyle: tagStyle[j.tag], age: j.age + "d", len: n(j.len) + " in" };
+        }),
+        footer: l.footer,
+        hasButton: !!l.btn,
+        btn: l.btn,
+        btnStyle: l.btn ? btnBase + btn[l.kind] : ""
+      };
+    });
+
+    var statValue = cond + "font-size:40px;line-height:1.05;font-variant-numeric:tabular-nums;";
+    var stats = [
+      { label: "Team score · 4 weeks", value: "91 / 100", style: statValue + "color:#F2F2F0;" },
+      { label: "Jobs waiting to print", value: "13", style: statValue + "color:#F2F2F0;" },
+      { label: "Rush jobs", value: "1", style: statValue + "color:#FF8A1F;" },
+      { label: "Inches queued", value: "5,436", style: statValue + "color:#F2F2F0;" },
+      { label: "Oldest job", value: "4 days", style: statValue + "color:#F2F2F0;" },
+      { label: "Next forced print", value: "Wed, Nov 11", style: statValue + "color:#F2F2F0;" }
+    ];
+
+    var mat = [
+      { code: "WH", name: "White print", days: 33 },
+      { code: "CR", name: "Chrome print", days: 12 },
+      { code: "GL", name: "Gloss laminate", days: 41 },
+      { code: "MT", name: "Matte laminate", days: 28 },
+      { code: "PR", name: "Prismatic laminate", days: 19 },
+      { code: "GG", name: "Gravel Guard lam.", days: 22 }
+    ];
+    var material = mat.map(function (m) {
+      var low = m.days < 15;
+      return {
+        code: m.code,
+        chipStyle: "padding:2px 7px;border-radius:5px;color:#141414;background:" + finishColor[m.code] + ";",
+        name: m.name,
+        days: m.days + " days",
+        note: low ? "Reorder now" : "On track",
+        boxStyle: "display:flex;flex-direction:column;gap:4px;padding:14px 16px;border-radius:10px;" + (low ? "border:2px solid #FF8A1F;background:#22190F;" : "border:1px solid #2A2F35;background:#141619;"),
+        valueStyle: cond + "font-size:34px;line-height:1.05;font-variant-numeric:tabular-nums;color:" + (low ? "#FF8A1F" : "#F2F2F0") + ";",
+        noteStyle: "font-size:14px;font-weight:" + (low ? "700" : "400") + ";color:" + (low ? "#FFB066" : "#A6ADB5") + ";"
+      };
+    });
+
+    return { stats: stats, lanes: lanes, material: material };
+  }
+}
+</script>
+</body>
+</html>

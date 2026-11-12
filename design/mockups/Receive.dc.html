@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Receive material</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#0F1113}
+a{color:#8EC5FF}a:hover{color:#B9DBFF}
+</style>
+</helmet>
+<main style="min-height: 100vh; box-sizing: border-box; background: #0F1113; color: #F2F2F0; font-family: Inter, system-ui, sans-serif; padding: 0 0 40px">
+<header style="background: #16181B; border-bottom: 4px solid #FF8A1F">
+<div style="max-width: 1440px; margin: 0 auto; box-sizing: border-box; padding: 18px 24px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px">
+<div style="display: flex; align-items: baseline; gap: 14px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 16px; letter-spacing: 0.14em; text-transform: uppercase; color: #FF8A1F">Dirty Graphix</span>
+<h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 38px; line-height: 1; letter-spacing: 0.02em; text-transform: uppercase">Receive material</h1>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<span style="font-size: 14px; color: #A6ADB5">Signed in as <strong style="color: #F2F2F0">Alex</strong> · Fri, Nov 6</span>
+<span style="font-size: 13px; color: #A6ADB5; border: 1px solid #3A4048; border-radius: 6px; padding: 3px 8px">Sample data · roll number format proposed</span>
+</div>
+</div>
+</header>
+<div style="max-width: 1440px; margin: 0 auto; box-sizing: border-box; padding: 22px 24px 0; display: flex; flex-direction: column; gap: 22px">
+
+<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+
+<section aria-label="Log a shipment" style="{{logStyle}}">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 28px; text-transform: uppercase">Log a shipment</h2>
+
+<div style="display: flex; flex-direction: column; gap: 10px">
+<span id="finish-label" style="font-size: 15px; font-weight: 600; color: #C9CED4">1. Material · print media or laminate</span>
+<div role="group" aria-labelledby="finish-label" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 10px">
+<sc-for list="{{finishes}}" as="f" hint-placeholder-count="6">
+<button type="button" onClick="{{f.pick}}" aria-pressed="{{f.selected}}" style="{{f.style}}"><span style="{{f.chipStyle}}">{{f.code}}</span>{{f.name}}</button>
+</sc-for>
+</div>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-end">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<span id="count-label" style="font-size: 15px; font-weight: 600; color: #C9CED4">2. Rolls received</span>
+<div role="group" aria-labelledby="count-label" style="display: flex; align-items: center; gap: 10px">
+<button type="button" onClick="{{dec}}" aria-label="One fewer roll" style="width: 56px; height: 56px; border-radius: 12px; border: 1px solid #5A616B; background: transparent; color: #F2F2F0; font-size: 28px; font-weight: 700; cursor: pointer">−</button>
+<span style="min-width: 64px; text-align: center; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 48px; font-variant-numeric: tabular-nums">{{count}}</span>
+<button type="button" onClick="{{inc}}" aria-label="One more roll" style="width: 56px; height: 56px; border-radius: 12px; border: 1px solid #5A616B; background: transparent; color: #F2F2F0; font-size: 28px; font-weight: 700; cursor: pointer">+</button>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<label for="roll-length" style="font-size: 15px; font-weight: 600; color: #C9CED4">Usable length per roll (in)</label>
+<input id="roll-length" type="number" value="{{rollLen}}" style="width: 160px; min-height: 56px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #5A616B; background: #101215; color: #F2F2F0; font-size: 22px; font-family: Inter, sans-serif; font-variant-numeric: tabular-nums">
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px; flex: 1 1 200px">
+<label for="po" style="font-size: 15px; font-weight: 600; color: #C9CED4">PO or packing slip (optional)</label>
+<input id="po" type="text" placeholder="e.g. PO 2291" style="min-height: 56px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #5A616B; background: #101215; color: #F2F2F0; font-size: 18px; font-family: Inter, sans-serif">
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 12px; background: #101215; border: 1px solid #2A2F35">
+<span style="font-size: 15px; font-weight: 600; color: #C9CED4">3. Roll numbers and labels</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{rolls}}" as="r" hint-placeholder-count="4">
+<span style="{{rollStyle}}">{{r}}</span>
+</sc-for>
+</div>
+<span style="font-size: 14px; color: #A6ADB5">{{summary}}</span>
+</div>
+
+<button type="button" style="min-height: 60px; border-radius: 12px; border: none; background: #FF8A1F; color: #141414; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 24px; letter-spacing: 0.05em; text-transform: uppercase; cursor: pointer">{{cta}}</button>
+</section>
+
+<aside style="flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+
+<section aria-label="On order" style="background: #181B1F; border: 1px solid #2A2F35; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 24px; text-transform: uppercase">On order</h2>
+<sc-for list="{{onOrder}}" as="o" hint-placeholder-count="2">
+<div style="{{o.rowStyle}}">
+<div style="display: flex; flex-direction: column; gap: 4px; min-width: 0">
+<span style="display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 600"><span style="{{o.chipStyle}}">{{o.code}}</span>{{o.what}}</span>
+<span style="font-size: 14px; color: #A6ADB5">{{o.when}}</span>
+</div>
+<button type="button" onClick="{{o.receive}}" style="min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid #5A616B; background: transparent; color: #F2F2F0; font-weight: 600; font-size: 15px; cursor: pointer">Receive this</button>
+</div>
+</sc-for>
+<button type="button" style="align-self: flex-start; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px dashed #5A616B; background: transparent; color: #C9CED4; font-weight: 600; font-size: 15px; cursor: pointer">+ Mark a reorder as placed</button>
+</section>
+
+<section aria-label="Monthly shelf count" style="background: #181B1F; border: 1px solid #2A2F35; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 24px; text-transform: uppercase">Monthly shelf count</h2>
+<span style="font-size: 17px">Next count due <strong>Tue, Dec 1</strong></span>
+<span style="font-size: 14px; color: #A6ADB5">Last count Mon, Nov 2 · 2 adjustments · Gloss −1 roll, Matte remnant MT-003 written off</span>
+<button type="button" style="align-self: flex-start; min-height: 48px; padding: 0 18px; border-radius: 10px; border: 1px solid #5A616B; background: transparent; color: #F2F2F0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 19px; letter-spacing: 0.05em; text-transform: uppercase; cursor: pointer">Start count</button>
+</section>
+
+<section aria-label="Recent inventory activity" style="background: #181B1F; border: 1px solid #2A2F35; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 4px">
+<h2 style="margin: 0 0 8px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 24px; text-transform: uppercase">Recent activity</h2>
+<sc-for list="{{activity}}" as="a" hint-placeholder-count="4">
+<div style="display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 10px; padding: 8px 0; border-top: 1px solid #23272C; font-size: 14px">
+<span style="color: #8A929B; font-variant-numeric: tabular-nums">{{a.when}}</span>
+<span style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: #E4E7EA"><sc-for list="{{a.chips}}" as="c" hint-placeholder-count="1"><span style="{{c.style}}">{{c.code}}</span></sc-for>{{a.what}}</span>
+</div>
+</sc-for>
+</section>
+
+</aside>
+</div>
+</div>
+</main>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var self = this;
+    var st = this.state || {};
+    var sel = st.finish || "WH";
+    var count = st.count || 4;
+    var color = { WH: "#F2F2F0", CR: "#C9CED4", GL: "#34C759", MT: "#3B82F6", PR: "#FF3DA0", GG: "#B57BFF" };
+    var names = { WH: "White print media", CR: "Chrome print media", GL: "Gloss laminate", MT: "Matte laminate", PR: "Prismatic laminate", GG: "Gravel Guard laminate" };
+    var next = { WH: 146, CR: 40, GL: 143, MT: 91, PR: 31, GG: 61 };
+    var chip = function (c) { return "padding:2px 7px;border-radius:5px;color:#141414;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;letter-spacing:.06em;background:" + color[c] + ";"; };
+    var btnBase = "display:flex;align-items:center;gap:10px;min-height:56px;padding:0 14px;border-radius:12px;cursor:pointer;font-family:Inter,sans-serif;font-size:17px;font-weight:600;color:#F2F2F0;text-align:left;";
+
+    var finishes = ["WH", "CR", "GL", "MT", "PR", "GG"].map(function (c) {
+      var on = c === sel;
+      return {
+        code: c, name: names[c], selected: on ? "true" : "false",
+        chipStyle: chip(c),
+        style: btnBase + (on ? "background:#22262B;border:3px solid " + color[c] + ";" : "background:transparent;border:1px solid #3A4048;"),
+        pick: function () { self.setState({ finish: c }); }
+      };
+    });
+
+    var pad = function (n) { var s = String(n); while (s.length < 4) { s = "0" + s; } return s; };
+    var rolls = [];
+    for (var i = 0; i < count; i++) { rolls.push(sel + "-R" + pad(next[sel] + i)); }
+    var rollLen = (sel === "GG" || sel === "PR") ? 864 : 1704;
+    var inches = (count * rollLen).toLocaleString("en-US");
+
+    var onOrder = [
+      { code: "CR", what: "Chrome print media · 6 rolls", when: "Ordered Wed, Nov 4 · expected Nov 13–18 · reorder alert paused", n: 6 },
+      { code: "PR", what: "Prismatic laminate · 2 rolls", when: "Ordered Fri, Oct 30 · expected Nov 9–12", n: 2 }
+    ].map(function (o) {
+      return { code: o.code, what: o.what, when: o.when, chipStyle: chip(o.code),
+        rowStyle: "display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0 12px 14px;border-top:1px solid #2A2F35;border-left:5px solid " + color[o.code] + ";flex-wrap:wrap;",
+        receive: function () { self.setState({ finish: o.code, count: o.n }); } };
+    });
+
+    var small = function (c) { return { code: c, style: "padding:1px 6px;border-radius:4px;color:#141414;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:.06em;background:" + color[c] + ";" }; };
+    var activity = [
+      { when: "Thu 3:12p", chips: [small("WH"), small("GL")], what: "Batch started · Gloss · 1,698 in off WH-R0141 and GL-R0139" },
+      { when: "Thu 1:40p", chips: [small("WH"), small("GG")], what: "Remnants saved · WH-015 · 1,020 in · GG-009 · 118 in" },
+      { when: "Wed 9:05a", chips: [small("CR")], what: "Reorder placed · Chrome print media · 6 rolls · TY" },
+      { when: "Tue 10:22a", chips: [small("MT")], what: "Received · Matte laminate · 4 rolls · MT-R0087 to MT-R0090 · Alex" },
+      { when: "Mon 8:30a", chips: [small("GL")], what: "Shelf count adjustment · Gloss laminate −1 roll · damaged in shipping · Alex" }
+    ];
+
+    return {
+      finishes: finishes,
+      count: String(count),
+      dec: function () { self.setState({ count: Math.max(1, count - 1) }); },
+      inc: function () { self.setState({ count: Math.min(20, count + 1) }); },
+      rolls: rolls,
+      rollStyle: "font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;letter-spacing:.04em;padding:6px 12px;border-radius:8px;border:1px solid #5A616B;border-left:6px solid " + color[sel] + ";font-variant-numeric:tabular-nums;",
+      logStyle: "flex:999 1 620px;min-width:0;background:#181B1F;border:1px solid #2A2F35;border-top:6px solid " + color[sel] + ";border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:22px;",
+      rollLen: String(rollLen),
+      summary: count + " " + (count === 1 ? "roll" : "rolls") + " · " + inches + " in of " + names[sel] + " added to inventory · one small roll label per roll",
+      cta: "Receive " + count + " " + (count === 1 ? "roll" : "rolls") + " · print " + count + " " + (count === 1 ? "label" : "labels"),
+      onOrder: onOrder,
+      activity: activity
+    };
+  }
+}
+</script>
+</body>
+</html>

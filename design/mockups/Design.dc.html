@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Design queue</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#F4F5F7}
+a{color:#1F6FD1}a:hover{color:#1556A6}
+</style>
+</helmet>
+<main style="min-height: 100vh; box-sizing: border-box; background: #F4F5F7; color: #16181B; font-family: Inter, system-ui, sans-serif; padding: 0 0 40px">
+<header style="background: #16181B; color: #F2F2F0; border-bottom: 4px solid #FF8A1F">
+<div style="position: relative; max-width: 1440px; margin: 0 auto; box-sizing: border-box; padding: 18px 24px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px">
+<div style="display: flex; align-items: baseline; gap: 14px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 16px; letter-spacing: 0.14em; text-transform: uppercase; color: #FF8A1F">Dirty Graphix</span>
+<h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 38px; line-height: 1; letter-spacing: 0.02em; text-transform: uppercase">Design queue</h1>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<span style="font-size: 14px; color: #A6ADB5">Signed in as <strong style="color: #F2F2F0">Alissa</strong> · Thu, Nov 5</span>
+<button type="button" style="min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid #4A515A; background: transparent; color: #F2F2F0; font-family: Inter, sans-serif; font-weight: 600; font-size: 15px; cursor: pointer">Reprint</button>
+<button type="button" style="min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid #4A515A; background: transparent; color: #F2F2F0; font-family: Inter, sans-serif; font-weight: 600; font-size: 15px; cursor: pointer">New manual job</button>
+<button type="button" onClick="{{toggleBell}}" aria-expanded="{{bellExpanded}}" aria-controls="notifications" aria-label="{{bellLabel}}" style="position: relative; width: 48px; height: 44px; border-radius: 10px; border: 1px solid #4A515A; background: {{bellBg}}; color: #F2F2F0; cursor: pointer; display: flex; align-items: center; justify-content: center">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
+<sc-if value="{{hasUnread}}" hint-placeholder-val="{{true}}"><span style="position: absolute; top: -7px; right: -7px; min-width: 22px; height: 22px; box-sizing: border-box; padding: 0 6px; border-radius: 999px; background: #FF8A1F; color: #141414; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 2px solid #16181B">{{unread}}</span></sc-if>
+</button>
+</div>
+<sc-if value="{{bellOpen}}" hint-placeholder-val="{{false}}">
+<div id="notifications" role="region" aria-label="Notifications" style="position: absolute; top: calc(100% + 4px); right: 24px; width: min(420px, calc(100vw - 48px)); z-index: 20; background: #FFFFFF; color: #16181B; border: 1px solid #DDE1E6; border-radius: 14px; box-shadow: 0 12px 32px rgba(22,24,27,.22); overflow: hidden">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid #EEF0F3">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px; text-transform: uppercase">Notifications</span>
+<button type="button" onClick="{{markAllRead}}" style="min-height: 36px; padding: 0 8px; border: none; background: transparent; color: #1F6FD1; font-weight: 600; font-size: 13px; cursor: pointer">Mark all read</button>
+</div>
+<sc-for list="{{notes}}" as="n" hint-placeholder-count="5">
+<div style="{{n.rowStyle}}">
+<span aria-hidden="true" style="{{n.dotStyle}}"></span>
+<span style="display: flex; flex-direction: column; gap: 2px; min-width: 0">
+<span style="font-size: 14px; font-weight: 600">{{n.title}}</span>
+<span style="font-size: 13px; color: #5A626C">{{n.detail}}</span>
+</span>
+<span style="margin-left: auto; font-size: 12px; color: #5A626C; white-space: nowrap">{{n.when}}</span>
+</div>
+</sc-for>
+<div style="padding: 10px 16px; font-size: 12px; color: #5A626C; background: #F8F9FA">A chime plays when something new arrives. Anything still open gets a morning email summary.</div>
+</div>
+</sc-if>
+</div>
+</header>
+<div style="max-width: 1440px; margin: 0 auto; box-sizing: border-box; padding: 20px 24px 0; display: flex; flex-direction: column; gap: 20px">
+
+<section aria-label="Your numbers this week" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px">
+<sc-for list="{{stats}}" as="s" hint-placeholder-count="4">
+<div style="{{s.style}}">
+<span style="font-size: 13px; color: #5A626C">{{s.label}}</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 34px; line-height: 1.1; font-variant-numeric: tabular-nums">{{s.value}}</span>
+<span style="font-size: 13px; color: #5A626C">{{s.note}}</span>
+</div>
+</sc-for>
+</section>
+
+<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+
+<nav aria-label="My assigned orders" style="flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: 18px">
+<section aria-label="Your to-dos" style="display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 14px; background: #16181B; color: #F2F2F0">
+<h2 style="margin: 0; display: flex; align-items: center; gap: 8px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 18px; letter-spacing: 0.06em; text-transform: uppercase">Your to-dos <span style="margin-left: auto; font-family: Inter, sans-serif; font-size: 13px; font-weight: 700; padding: 2px 9px; border-radius: 999px; color: #141414; background: #FF8A1F">{{todoCount}}</span></h2>
+<span style="font-size: 12px; color: #A6ADB5; margin-top: -4px">Work outside your order queue: kit steps and questions from the team</span>
+<sc-for list="{{todos}}" as="t" hint-placeholder-count="3">
+<button type="button" role="checkbox" aria-checked="{{t.checked}}" onClick="{{t.toggle}}" style="{{t.rowStyle}}">
+<span aria-hidden="true" style="{{t.boxStyle}}">{{t.mark}}</span>
+<span style="display: flex; flex-direction: column; gap: 3px; min-width: 0; text-align: left">
+<span style="{{t.textStyle}}">{{t.text}}</span>
+<span style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px"><span style="{{t.tagStyle}}">{{t.tag}}</span><span style="font-size: 12px; color: #A6ADB5">{{t.meta}}</span></span>
+</span>
+</button>
+</sc-for>
+</section>
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="4">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<h2 style="margin: 0; display: flex; align-items: center; gap: 8px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 18px; letter-spacing: 0.06em; text-transform: uppercase; color: #16181B"><span aria-hidden="true" style="{{g.dotStyle}}"></span>{{g.title}} <span style="{{g.countStyle}}">{{g.count}}</span></h2>
+<sc-for list="{{g.items}}" as="it" hint-placeholder-count="2">
+<a href="#detail" style="{{it.cardStyle}}">
+<span style="display: flex; justify-content: space-between; align-items: center; gap: 8px">
+<span style="font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums">{{it.order}}</span>
+<span style="{{it.tagStyle}}">{{it.tag}}</span>
+</span>
+<span style="font-size: 15px; color: #16181B">{{it.machine}}</span>
+<span style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px">
+<sc-for list="{{it.chips}}" as="c" hint-placeholder-count="1">
+<span style="{{c.style}}">{{c.text}}</span>
+</sc-for>
+</span>
+<span style="{{it.metaStyle}}">{{it.meta}}</span>
+</a>
+</sc-for>
+</div>
+</sc-for>
+</nav>
+
+<section id="detail" aria-label="Order 4820" style="flex: 999 1 560px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE1E6; border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 22px">
+
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; align-items: flex-start">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 14px; color: #5A626C">R. Hanson Excavating · ordered Tue, Nov 3</span>
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 38px; line-height: 1; text-transform: uppercase">#4820 · 2 machines</h2>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px">
+<span style="font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: #E8F7EE; color: #17643A; border: 1px solid #B9E3C8">Customer approved · 7:44 AM</span>
+<sc-for list="{{orderChips}}" as="c" hint-placeholder-count="2">
+<span style="{{c.style}}">{{c.text}}</span>
+</sc-for>
+<span style="font-size: 13px; color: #5A626C">ships together</span>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px">
+<button type="button" aria-expanded="{{actionsExpanded}}" aria-controls="order-actions" onClick="{{toggleActions}}" style="min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid #16181B; background: #16181B; color: #FFFFFF; font-weight: 600; font-size: 14px; cursor: pointer">{{actionsLabel}}</button>
+</div>
+<sc-if value="{{actionsOpen}}" hint-placeholder-val="{{false}}">
+<div id="order-actions" style="margin-top: 10px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px; padding: 14px; border: 1px solid #DDE1E6; border-radius: 12px; background: #F8F9FA">
+<div role="group" aria-label="Ask the customer" style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #1F6FD1">Ask the customer</span>
+<button type="button" style="min-height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #C5CBD3; background: #FFFFFF; color: #16181B; font-weight: 600; font-size: 14px; text-align: left; cursor: pointer">Need logo file</button>
+<button type="button" style="min-height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #C5CBD3; background: #FFFFFF; color: #16181B; font-weight: 600; font-size: 14px; text-align: left; cursor: pointer">Need more info</button>
+<button type="button" style="min-height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #C5CBD3; background: #FFFFFF; color: #16181B; font-weight: 600; font-size: 14px; text-align: left; cursor: pointer">Send reminder</button>
+</div>
+<div role="group" aria-label="Customer told you directly" style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #17643A">Customer told you directly</span>
+<button type="button" onClick="{{pickApprove}}" style="min-height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #17643A; background: #FFFFFF; color: #17643A; font-weight: 600; font-size: 14px; text-align: left; cursor: pointer">Approve manually</button>
+<button type="button" onClick="{{pickReject}}" style="min-height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #9B1C1C; background: #FFFFFF; color: #9B1C1C; font-weight: 600; font-size: 14px; text-align: left; cursor: pointer">Reject manually</button>
+</div>
+<div role="group" aria-label="Flag this order" style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #A84C05">Flag this order</span>
+<button type="button" style="min-height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #C5CBD3; background: #FFFFFF; color: #16181B; font-weight: 600; font-size: 14px; text-align: left; cursor: pointer">Needs billing change</button>
+<button type="button" style="min-height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #FF8A1F; background: #FFF4EA; color: #A84C05; font-weight: 600; font-size: 14px; text-align: left; cursor: pointer">Mark as rush</button>
+<button type="button" style="min-height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #C5CBD3; background: #FFFFFF; color: #16181B; font-weight: 600; font-size: 14px; text-align: left; cursor: pointer">New kit needed</button>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{showManual}}" hint-placeholder-val="{{false}}">
+<div style="{{manualBoxStyle}}">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; text-transform: uppercase">{{manualTitle}}</span>
+<div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="manual-how" style="font-size: 14px; font-weight: 600">How did the customer tell you?</label>
+<select id="manual-how" style="min-width: 180px; min-height: 44px; padding: 0 10px; border: 1px solid #9AA3AE; border-radius: 10px; font-size: 15px; font-family: Inter, sans-serif; background: #FFFFFF; color: #16181B">
+<option>Phone call</option>
+<option>In person</option>
+<option>Text message</option>
+<option>Other</option>
+</select>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="manual-note" style="font-size: 14px; font-weight: 600">Note (required): what the customer said and why</label>
+<textarea id="manual-note" rows="2" onInput="{{setNote}}" placeholder="e.g. Customer called, approved both machines as shown" style="box-sizing: border-box; width: 100%; padding: 10px 14px; border: 1px solid #9AA3AE; border-radius: 10px; font-size: 15px; font-family: Inter, sans-serif; background: #FFFFFF; color: #16181B; resize: vertical"></textarea>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+<button type="button" disabled="{{noteEmpty}}" style="{{saveStyle}}">{{saveText}}</button>
+<button type="button" onClick="{{cancelManual}}" style="min-height: 44px; padding: 0 14px; border-radius: 10px; border: none; background: transparent; color: #1F6FD1; font-weight: 600; font-size: 14px; cursor: pointer">Cancel</button>
+<span style="font-size: 13px; color: #3A4047">Saved to the timeline with your name and the time. The customer gets an email confirming it.</span>
+</div>
+</div>
+</sc-if>
+</div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid #DDE1E6; border-left: 6px solid #1F6FD1; border-radius: 12px; background: #F3F8FE">
+<div style="display: flex; flex-direction: column">
+<span style="font-size: 12px; color: #5A626C">Print file due</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums">Tue, Nov 10</span>
+<span style="font-size: 12px; color: #5A626C">3 business days from approval · 2-machine order</span>
+</div>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 20px">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<h3 style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #5A626C">Order details</h3>
+<dl style="margin: 0; display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px 12px; font-size: 15px">
+<dt style="color: #5A626C">Customer</dt><dd style="margin: 0">[Customer name] · R. Hanson Excavating</dd>
+<dt style="color: #5A626C">Order notes</dt><dd style="margin: 0; font-weight: 600">“Company name on both cab doors.”</dd>
+<dt style="color: #5A626C">Uploads</dt><dd style="margin: 0">2 logo files from checkout</dd>
+<dt style="color: #5A626C">Payment</dt><dd style="margin: 0">Paid in full · Standard (not rush)</dd>
+</dl>
+<button type="button" aria-expanded="{{contactExpanded}}" onClick="{{toggleContact}}" style="align-self: flex-start; min-height: 40px; padding: 0 2px; border: none; background: transparent; color: #1F6FD1; font-weight: 600; font-size: 14px; cursor: pointer">{{contactLabel}}</button>
+<sc-if value="{{contactOpen}}" hint-placeholder-val="{{false}}">
+<dl style="margin: 0; display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px 12px; font-size: 15px">
+<dt style="color: #5A626C">Email</dt><dd style="margin: 0">[Customer email]</dd>
+<dt style="color: #5A626C">Phone</dt><dd style="margin: 0">[Customer phone]</dd>
+<dt style="color: #5A626C">Ship to</dt><dd style="margin: 0">[Shipping address]</dd>
+<dt style="color: #5A626C">Shipping</dt><dd style="margin: 0">[Shipping method]</dd>
+</dl>
+</sc-if>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px">
+<h3 style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #5A626C">Timeline</h3>
+<ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column">
+<sc-for list="{{timeline}}" as="e" hint-placeholder-count="6">
+<li style="display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid #EEF0F3; font-size: 15px">
+<span aria-hidden="true" style="{{e.dotStyle}}"></span>
+<span><span style="font-weight: 600">{{e.label}}</span> <span style="color: #5A626C">· {{e.time}}</span></span>
+<span style="{{e.durStyle}}">{{e.dur}}</span>
+</li>
+</sc-for>
+</ol>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px">
+<h3 style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #5A626C">Machines on this order · from the customizer</h3>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px">
+<sc-for list="{{machines}}" as="m" hint-placeholder-count="2">
+<div style="{{m.cardStyle}}">
+<span style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px">
+<span style="font-weight: 700; font-size: 17px">{{m.name}}</span>
+<span style="{{m.chipStyle}}">{{m.chip}}</span>
+</span>
+<dl style="margin: 0; display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 6px 10px; font-size: 14px">
+<dt style="color: #5A626C">Kit</dt><dd style="margin: 0">{{m.kit}}</dd>
+<dt style="color: #5A626C">Design</dt><dd style="margin: 0">[Design selection]</dd>
+<dt style="color: #5A626C">Colors</dt><dd style="margin: 0">[Color selections]</dd>
+</dl>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="border: 2px solid #1F6FD1; border-radius: 14px; padding: 20px; background: #F3F8FE; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h3 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px; text-transform: uppercase">Hand off to production</h3>
+<span style="font-size: 14px; color: #3A4047">Print files due Tue, Nov 10 (3 business days from approval). Build a file for each machine, sign off the checklist and log each machine's length at ¼ scale.</span>
+</div>
+<fieldset style="margin: 0; padding: 14px 16px; border: 1px solid #C9D7EA; border-radius: 12px; background: #FFFFFF; display: flex; flex-direction: column; gap: 10px">
+<legend style="padding: 0 6px; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #3A4047">Design checklist</legend>
+<sc-for list="{{checklist}}" as="c" hint-placeholder-count="2">
+<div style="display: flex; align-items: center; gap: 12px; min-height: 44px">
+<input type="checkbox" id="{{c.id}}" checked="{{c.checked}}" onChange="{{c.toggle}}" style="width: 22px; height: 22px; margin: 0; accent-color: #1F6FD1; cursor: pointer">
+<label for="{{c.id}}" style="font-size: 16px; cursor: pointer">{{c.label}}</label>
+</div>
+</sc-for>
+<sc-if value="{{allChecked}}" hint-placeholder-val="{{false}}">
+<span style="font-size: 14px; font-weight: 600; color: #17643A">Signed off by Alissa · Thu, Nov 5, 8:21 AM</span>
+</sc-if>
+<sc-if value="{{notAllChecked}}" hint-placeholder-val="{{true}}">
+<span style="font-size: 14px; color: #5A626C">Check every item to sign off. Your name and the time are saved with the order.</span>
+</sc-if>
+</fieldset>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="prod-notes" style="font-size: 14px; font-weight: 600">Notes for production (optional)</label>
+<textarea id="prod-notes" rows="2" placeholder="e.g. Customer added a second door logo, print panel 4 twice" style="box-sizing: border-box; width: 100%; padding: 10px 14px; border: 1px solid #9AA3AE; border-radius: 10px; font-size: 15px; font-family: Inter, sans-serif; background: #FFFFFF; color: #16181B; resize: vertical"></textarea>
+<span style="font-size: 13px; color: #3A4047">Prints on the job ticket and shows on the production screen.</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<sc-for list="{{machines}}" as="m" hint-placeholder-count="2">
+<div style="{{m.rowStyle}}">
+<div style="display: flex; flex-direction: column; gap: 6px; flex: 1 1 200px; min-width: 0">
+<span style="font-weight: 700; font-size: 16px">{{m.name}}</span>
+<span style="{{m.chipStyle}}; align-self: flex-start">{{m.chip}}</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="{{m.lenId}}" style="font-size: 14px; font-weight: 600">Length at ¼ scale (in)</label>
+<input id="{{m.lenId}}" type="number" inputmode="decimal" value="{{m.qtr}}" onInput="{{m.setLen}}" style="width: 160px; min-height: 48px; box-sizing: border-box; padding: 0 14px; border: 1px solid #9AA3AE; border-radius: 10px; font-size: 20px; font-family: Inter, sans-serif; font-variant-numeric: tabular-nums; background: #FFFFFF; color: #16181B">
+</div>
+<div style="display: flex; flex-direction: column; gap: 2px; min-width: 170px">
+<span style="font-size: 12px; color: #5A626C">Full size for production (×4)</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px; font-variant-numeric: tabular-nums">{{m.full}}</span>
+</div>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 14px; align-items: center">
+<button type="button" disabled="{{notAllChecked}}" style="{{handoffStyle}}">Hand off both machines</button>
+<span style="font-size: 13px; color: #3A4047; flex: 1 1 280px">Both machines go to production together, so they print close together and ship in one box.</span>
+</div>
+<span style="font-size: 13px; color: #3A4047">Starts the production clock, puts the jobs on the shop TV, and emails the customer that their order is in the production queue.</span>
+</div>
+
+</section>
+</div>
+</div>
+</main>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var self = this;
+    var st = this.state || {};
+    var FIN = { GL: ["Gloss", "#34C759"], MT: ["Matte", "#3B82F6"], GG: ["Gravel Guard", "#B57BFF"], CG: ["Chrome Gloss", "#E6FF2E"],
+      PR: ["Prismatic", "#FF3DA0"], CM: ["Chrome Matte", "#14B8A6"], CP: ["Chrome Prismatic", "#9AA3AE"] };
+    var chipStyle = function (code) { return "display:inline-block;font-size:12px;font-weight:700;letter-spacing:.04em;padding:3px 8px;border-radius:6px;color:#141414;white-space:nowrap;background:" + FIN[code][1] + ";"; };
+    var chip = function (code) { return { text: code + " · " + FIN[code][0], style: chipStyle(code) }; };
+    var arrow = { text: "→", style: "font-size:14px;font-weight:700;color:#5A626C;" };
+    var cardBase = "display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:12px;text-decoration:none;color:#16181B;";
+    var card = "background:#FFFFFF;border:1px solid #DDE1E6;";
+    var cardSel = "background:#FFFFFF;border:2px solid #16181B;box-shadow:0 2px 8px rgba(22,24,27,.12);";
+    var tagBase = "font-size:12px;font-weight:700;letter-spacing:.06em;padding:3px 8px;border-radius:6px;white-space:nowrap;";
+    var tags = {
+      "RUSH": tagBase + "background:#FF8A1F;color:#141414;",
+      "REV 2": tagBase + "background:#FFF1E3;color:#A84C05;border:1px solid #F5C08C;",
+      "REPRINT": tagBase + "background:#FDECEC;color:#9B1C1C;border:1px solid #F3B5B5;",
+      "": ""
+    };
+    var meta = "font-size:13px;color:#5A626C;";
+    var metaWarn = "font-size:13px;font-weight:600;color:#A84C05;";
+    var paid = {};
+    var mk = function (o, machine, chips, tag, m, warn, sel) {
+      return { order: "#" + o + (paid[o] ? " · " + paid[o] : ""), machine: machine, chips: chips, tag: tag, tagStyle: tags[tag],
+        meta: m, metaStyle: warn ? metaWarn : meta, sel: sel };
+    };
+    var groups = [
+      { title: "Reprint requests", c: "#D93636", items: [
+        mk("4802 · R-0014", "CAT 262D3", [chip("GL")], "REPRINT", "Panels 3 and 7 only · 1 photo · production error · from Alex 9:10 AM", true, false)
+      ] },
+      { title: "Needs first proof", c: "#1F6FD1", items: [
+        mk(4826, "CAT 299D3", [chip("GG")], "RUSH", "Ordered 2h ago · rush, proof today", true, false),
+        mk(4825, "Bobcat T66", [chip("GL")], "", "Ordered 5h ago", false, false)
+      ] },
+      { title: "Revision requested", c: "#E07B00", items: [
+        mk(4818, "Kubota SVL97-2", [chip("MT")], "REV 2", "Requested 1h ago", true, false)
+      ] },
+      { title: "Waiting on customer", c: "#8A94A0", items: [
+        mk(4814, "CAT 308 CR", [chip("PR")], "", "Proof sent 2 days ago · auto reminder sent", false, false)
+      ] },
+      { title: "Waiting on billing", c: "#8A94A0", items: [
+        mk(4822, "Bobcat T770", [chip("MT"), arrow, chip("CM")], "", "Sent to Nikki 10:15 AM · clock paused until paid", false, false)
+      ] },
+      { title: "Approved · print file", c: "#17803D", items: [
+        mk(4820, "John Deere 325G + CAT 259D3", [chip("CG"), chip("GL")], "", "Approved 30m ago · print file due Tue, Nov 10", false, true)
+      ] }
+    ].map(function (g) {
+      return { title: g.title, count: String(g.items.length),
+        dotStyle: "display:inline-block;width:12px;height:12px;border-radius:3px;background:" + g.c + ";",
+        countStyle: "margin-left:auto;font-family:Inter,sans-serif;font-size:13px;font-weight:700;padding:2px 9px;border-radius:999px;color:#FFFFFF;background:" + g.c + ";",
+        items: g.items.map(function (it) { it.cardStyle = cardBase + (it.sel ? cardSel : card) + "border-left:6px solid " + g.c + ";"; return it; }) };
+    });
+
+    var dot = "display:inline-block;width:10px;height:10px;border-radius:999px;";
+    var timeline = [
+      { label: "Ordered", time: "Tue 9:12 AM", dur: "", c: "#9AA3AE" },
+      { label: "Assigned to Alissa", time: "Tue 9:40 AM", dur: "", c: "#9AA3AE" },
+      { label: "First proof sent", time: "Tue 2:05 PM", dur: "4h 53m", c: "#1F6FD1" },
+      { label: "Revision requested", time: "Wed 8:30 AM", dur: "", c: "#A84C05" },
+      { label: "Revision 1 sent", time: "Wed 10:15 AM", dur: "1h 45m", c: "#1F6FD1" },
+      { label: "Customer approved", time: "Thu 7:44 AM", dur: "", c: "#17643A" }
+    ].map(function (e) {
+      return { label: e.label, time: e.time, dur: e.dur,
+        dotStyle: dot + "background:" + e.c + ";",
+        durStyle: "font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:#3A4047;" };
+    });
+
+    var statBase = "background:#FFFFFF;border:1px solid #DDE1E6;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:2px;border-top:5px solid ";
+    var stats = [
+      { label: "Your score", value: "84 / 100", note: "Rolling 4 weeks · only you see this", c: "#FF8A1F" },
+      { label: "Orders this month", value: "27", note: "Assigned to you · 22 handed off", c: "#16181B" },
+      { label: "Order to first proof", value: "5h 10m", note: "Avg this week", c: "#1F6FD1" },
+      { label: "Revision turnaround", value: "2h 05m", note: "Avg this week", c: "#E07B00" }
+    ].map(function (s) { s.style = statBase + s.c + ";"; return s; });
+    var orderChips = [chip("CG"), chip("GL")];
+    var bellOpen = st.bell !== undefined ? st.bell : !!(this.props && this.props.bellOpen);
+    var read = !!st.read;
+    var notes = [
+      { title: "Kit step ready: CAT 255 · Apply design", detail: "Cierra finished the depth layer", when: "9:52 AM", c: "#5B6B7A", unread: true },
+      { title: "New rush order assigned: #4826", detail: "CAT 299D3 · from Cierra · proof due today", when: "9:40 AM", c: "#FF8A1F", unread: true },
+      { title: "Reprint request: R-0014 for #4802", detail: "Panels 3 and 7 · from Alex in production", when: "9:10 AM", c: "#D93636", unread: true },
+      { title: "Revision requested: #4818", detail: "Customer sent changes from the proof page", when: "8:30 AM", c: "#E07B00", unread: false },
+      { title: "Question from Nikki on #4822", detail: "“Is the T770 a full kit or doors only?”", when: "8:05 AM", c: "#1F6FD1", unread: false }
+    ].map(function (n) {
+      var u = n.unread && !read;
+      n.rowStyle = "display:flex;align-items:flex-start;gap:10px;padding:12px 16px;border-bottom:1px solid #EEF0F3;" + (u ? "background:#FFF8EF;" : "");
+      n.dotStyle = "flex:0 0 10px;width:10px;height:10px;border-radius:999px;margin-top:5px;background:" + n.c + ";";
+      return n;
+    });
+    var unread = read ? 0 : notes.filter(function (n) { return n.unread; }).length;
+    var tdone = st.tdone || {};
+    var todoDefs = [
+      { id: "t1", text: "CAT 255 · Apply design", tag: "KIT STEP", tc: "#5B6B7A", meta: "Ready since 9:52 AM · needed before web images" },
+      { id: "t2", text: "Kubota SVL97-2 · Save as web images", tag: "KIT STEP", tc: "#5B6B7A", meta: "Waiting on depth layer · Cierra" , blocked: true },
+      { id: "t3", text: "Answer Nikki: full kit or doors only on #4822?", tag: "QUESTION", tc: "#1F6FD1", meta: "From Nikki · 8:05 AM" }
+    ];
+    var todoOpen = 0;
+    var todos = todoDefs.map(function (t) {
+      var d = !!tdone[t.id];
+      if (!d) { todoOpen++; }
+      return {
+        text: t.text, tag: t.tag, meta: t.meta, checked: d ? "true" : "false", mark: d ? "✓" : "",
+        rowStyle: "display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid #2A2F35;background:#1F2328;color:#F2F2F0;font-family:Inter,sans-serif;cursor:pointer;width:100%;" + (t.blocked && !d ? "opacity:.6;" : ""),
+        boxStyle: "flex:0 0 22px;width:22px;height:22px;box-sizing:border-box;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;margin-top:1px;" + (d ? "background:#17803D;color:#FFFFFF;border:none;" : "border:2px solid #5A616B;color:transparent;"),
+        textStyle: "font-size:14px;line-height:1.35;" + (d ? "color:#8A929B;text-decoration:line-through;" : "font-weight:600;"),
+        tagStyle: "font-size:11px;font-weight:700;letter-spacing:.06em;padding:1px 6px;border-radius:4px;color:#FFFFFF;background:" + t.tc + ";",
+        toggle: function () { var n = Object.assign({}, tdone); n[t.id] = !d; self.setState({ tdone: n }); }
+      };
+    });
+    var actionsOpen = !!st.actions;
+    var contactOpen = !!st.contact;
+    var items = [
+      { id: "chk-logos", label: "All logos are in the correct place on every machine" },
+      { id: "chk-contour", label: "Cut contour lines are set at the correct amount on every machine" }
+    ];
+    var checklist = items.map(function (it) {
+      var on = !!st[it.id];
+      return { id: it.id, label: it.label, checked: on,
+        toggle: function () { var u = {}; u[it.id] = !on; self.setState(u); } };
+    });
+    var allChecked = checklist.every(function (c) { return c.checked; });
+    var btnBase = "min-height:48px;padding:0 22px;border-radius:10px;border:none;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;letter-spacing:.05em;text-transform:uppercase;";
+    var handoffStyle = btnBase + (allChecked ? "background:#1F6FD1;color:#FFFFFF;cursor:pointer;" : "background:#DDE1E6;color:#5A626C;cursor:not-allowed;");
+
+    var lens = st.lens || { a: "155", b: "135" };
+    var machines = [
+      { key: "a", name: "John Deere 325G", kit: "Full wrap kit", code: "CG" },
+      { key: "b", name: "CAT 259D3", kit: "Full wrap kit", code: "GL" }
+    ].map(function (m) {
+      var q = parseFloat(lens[m.key]);
+      var full = isNaN(q) ? "—" : (q * 4).toLocaleString("en-US") + " in · " + Math.round(q * 4 / 12) + " ft";
+      var fc = FIN[m.code][1];
+      return { name: m.name, kit: m.kit, chip: m.code + " · " + FIN[m.code][0], chipStyle: chipStyle(m.code),
+        cardStyle: "border:1px solid #DDE1E6;border-top:8px solid " + fc + ";border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;",
+        rowStyle: "display:flex;flex-wrap:wrap;gap:14px 20px;align-items:flex-end;padding:12px 14px;background:#FFFFFF;border:1px solid #C9D7EA;border-left:8px solid " + fc + ";border-radius:12px;",
+        lenId: "len-" + m.key, qtr: lens[m.key], full: full,
+        setLen: function (e) { var n = Object.assign({}, lens); n[m.key] = e.target.value; self.setState({ lens: n }); } };
+    });
+
+    var manual = st.manual || null;
+    var note = st.note || "";
+    var noteEmpty = note.trim() === "";
+    var isApprove = manual === "approve";
+    var mBtn = "min-height:44px;padding:0 18px;border-radius:10px;border:none;font-weight:700;font-size:14px;";
+
+    return {
+      showManual: !!manual,
+      manualTitle: isApprove ? "Record a manual approval" : "Record a manual rejection",
+      manualBoxStyle: "display:flex;flex-direction:column;gap:12px;margin-top:12px;padding:16px;border-radius:12px;" + (isApprove ? "background:#F0FAF4;border:2px solid #17643A;" : "background:#FDF3F3;border:2px solid #9B1C1C;"),
+      orderChips: orderChips,
+      bellOpen: bellOpen, bellExpanded: bellOpen ? "true" : "false",
+      bellBg: bellOpen ? "#2A2F35" : "transparent",
+      hasUnread: unread > 0, unread: String(unread),
+      bellLabel: "Notifications, " + unread + " unread",
+      toggleBell: function () { self.setState({ bell: !bellOpen }); },
+      markAllRead: function () { self.setState({ read: true }); },
+      notes: notes, todos: todos, todoCount: String(todoOpen),
+      actionsOpen: actionsOpen, actionsExpanded: actionsOpen ? "true" : "false",
+      actionsLabel: actionsOpen ? "Hide actions ▴" : "Order actions ▾",
+      toggleActions: function () { self.setState({ actions: !actionsOpen }); },
+      contactOpen: contactOpen, contactExpanded: contactOpen ? "true" : "false",
+      contactLabel: contactOpen ? "Hide contact and shipping" : "Show contact and shipping",
+      toggleContact: function () { self.setState({ contact: !contactOpen }); },
+      pickApprove: function () { self.setState({ manual: "approve", note: "", actions: false }); },
+      pickReject: function () { self.setState({ manual: "reject", note: "", actions: false }); },
+      cancelManual: function () { self.setState({ manual: null, note: "" }); },
+      setNote: function (e) { self.setState({ note: e.target.value }); },
+      noteEmpty: noteEmpty,
+      saveText: isApprove ? "Save approval" : "Save rejection",
+      saveStyle: mBtn + (noteEmpty ? "background:#DDE1E6;color:#5A626C;cursor:not-allowed;" : (isApprove ? "background:#17643A;color:#FFFFFF;cursor:pointer;" : "background:#9B1C1C;color:#FFFFFF;cursor:pointer;")),
+      machines: machines, groups: groups, timeline: timeline, stats: stats, checklist: checklist,
+      allChecked: allChecked, notAllChecked: !allChecked, handoffStyle: handoffStyle };
+  }
+}
+</script>
+</body>
+</html>

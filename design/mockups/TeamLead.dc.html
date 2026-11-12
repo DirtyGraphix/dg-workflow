@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Daily assignment</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#F4F5F7}
+a{color:#1F6FD1}a:hover{color:#1556A6}
+</style>
+</helmet>
+<main style="min-height: 100vh; box-sizing: border-box; background: #F4F5F7; color: #16181B; font-family: Inter, system-ui, sans-serif; padding: 0 0 40px">
+<header style="background: #16181B; color: #F2F2F0; border-bottom: 4px solid #FF8A1F">
+<div style="max-width: 1440px; margin: 0 auto; box-sizing: border-box; padding: 18px 24px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px">
+<div style="display: flex; align-items: baseline; gap: 14px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 16px; letter-spacing: 0.14em; text-transform: uppercase; color: #FF8A1F">Dirty Graphix</span>
+<h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 38px; line-height: 1; letter-spacing: 0.02em; text-transform: uppercase">Assign today's orders</h1>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<span style="font-size: 14px; color: #A6ADB5">Signed in as <strong style="color: #F2F2F0">Cierra</strong> · Thu, Nov 5 · 5 new since yesterday</span>
+<button type="button" style="min-height: 48px; padding: 0 20px; border-radius: 10px; border: none; background: #FF8A1F; color: #141414; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 19px; letter-spacing: 0.05em; text-transform: uppercase; cursor: pointer">Assign all as suggested</button>
+</div>
+</div>
+</header>
+<div style="max-width: 1440px; margin: 0 auto; box-sizing: border-box; padding: 20px 24px 0; display: flex; flex-direction: column; gap: 20px">
+
+<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+
+<section aria-label="Unassigned orders" style="flex: 1 1 440px; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; display: flex; align-items: center; gap: 8px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; letter-spacing: 0.06em; text-transform: uppercase"><span aria-hidden="true" style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #1F6FD1"></span>Unassigned <span style="margin-left: auto; font-family: Inter, sans-serif; font-size: 13px; font-weight: 700; padding: 2px 9px; border-radius: 999px; color: #FFFFFF; background: #1F6FD1">5</span></h2>
+<sc-for list="{{orders}}" as="o" hint-placeholder-count="5">
+<div style="{{o.cardStyle}}">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap">
+<span style="font-weight: 700; font-size: 17px; font-variant-numeric: tabular-nums">{{o.order}}</span>
+<span style="{{o.tagStyle}}">{{o.tag}}</span>
+</div>
+<sc-for list="{{o.machines}}" as="m" hint-placeholder-count="1">
+<span style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 15px">{{m.name}} <span style="{{m.chipStyle}}">{{m.chip}}</span></span>
+</sc-for>
+<span style="font-size: 13px; color: #5A626C">{{o.meta}}</span>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-top: 6px; border-top: 1px solid #EEF0F3">
+<label for="{{o.selId}}" style="font-size: 13px; font-weight: 600; color: #3A4047">Assign to</label>
+<select id="{{o.selId}}" style="min-height: 44px; min-width: 200px; padding: 0 10px; border: 1px solid #9AA3AE; border-radius: 10px; font-size: 15px; font-family: Inter, sans-serif; background: #FFFFFF; color: #16181B">
+<option>{{o.suggested}}</option>
+<option>Andrew · 5 open</option>
+<option>Alissa · 3 open</option>
+<option>Bekah · 6 open</option>
+<option>Cierra · 2 open</option>
+</select>
+<span style="font-size: 13px; color: #5A626C">{{o.why}}</span>
+</div>
+</div>
+</sc-for>
+</section>
+
+<section aria-label="Designer workload" style="flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; letter-spacing: 0.06em; text-transform: uppercase">Designer workload</h2>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 12px">
+<sc-for list="{{designers}}" as="d" hint-placeholder-count="4">
+<article style="background: #FFFFFF; border: 1px solid #DDE1E6; border-top: 5px solid #16181B; border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px">
+<h3 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 28px; text-transform: uppercase">{{d.name}} <span style="font-family: Inter, sans-serif; font-size: 13px; font-weight: 600; text-transform: none; color: #5A626C">{{d.role}}</span></h3>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; font-variant-numeric: tabular-nums">{{d.open}}</span>
+</div>
+<div role="img" aria-label="{{d.barLabel}}" style="display: flex; height: 14px; border-radius: 999px; overflow: hidden; background: #EEF0F3">
+<sc-for list="{{d.bar}}" as="b" hint-placeholder-count="4"><div style="{{b.style}}"></div></sc-for>
+</div>
+<dl style="margin: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; font-size: 14px">
+<sc-for list="{{d.rows}}" as="r" hint-placeholder-count="4">
+<dt style="{{r.dtStyle}}">{{r.label}}</dt><dd style="margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right">{{r.value}}</dd>
+</sc-for>
+</dl>
+<div style="display: flex; flex-direction: column; gap: 4px; padding-top: 10px; border-top: 1px solid #EEF0F3">
+<span style="font-size: 13px; color: #5A626C">Avg first proof this week</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px; font-variant-numeric: tabular-nums">{{d.firstProof}}</span>
+</div>
+</article>
+</sc-for>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: #3A4047">
+<span style="display: inline-flex; align-items: center; gap: 6px"><span aria-hidden="true" style="width: 12px; height: 12px; border-radius: 3px; background: #1F6FD1"></span>Needs proof or revision</span>
+<span style="display: inline-flex; align-items: center; gap: 6px"><span aria-hidden="true" style="width: 12px; height: 12px; border-radius: 3px; background: #8A94A0"></span>Waiting on customer</span>
+<span style="display: inline-flex; align-items: center; gap: 6px"><span aria-hidden="true" style="width: 12px; height: 12px; border-radius: 3px; background: #17803D"></span>Approved, needs print file</span>
+</div>
+</section>
+
+</div>
+</div>
+</main>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1120}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var FIN = { GL: ["Gloss", "#34C759"], MT: ["Matte", "#3B82F6"], GG: ["Gravel Guard", "#B57BFF"], CG: ["Chrome Gloss", "#E6FF2E"],
+      PR: ["Prismatic", "#FF3DA0"], CM: ["Chrome Matte", "#14B8A6"], CP: ["Chrome Prismatic", "#9AA3AE"] };
+    var chipStyle = function (code) { return "display:inline-block;font-size:12px;font-weight:700;letter-spacing:.04em;padding:3px 8px;border-radius:6px;color:#141414;white-space:nowrap;background:" + FIN[code][1] + ";"; };
+    var mach = function (name, code) { return { name: name, chip: code + " · " + FIN[code][0], chipStyle: chipStyle(code) }; };
+    var cardBase = "background:#FFFFFF;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;border:1px solid #DDE1E6;";
+    var tagBase = "font-size:12px;font-weight:700;letter-spacing:.06em;padding:3px 8px;border-radius:6px;white-space:nowrap;";
+    var tagStyles = {
+      rush: tagBase + "background:#FF8A1F;color:#141414;",
+      reprint: tagBase + "background:#D93636;color:#FFFFFF;",
+      split: tagBase + "background:#F0F2F5;color:#3A4047;border:1px solid #DDE1E6;",
+      none: ""
+    };
+    var stripe = { rush: "#FF8A1F", reprint: "#D93636", split: "#1F6FD1", none: "#1F6FD1" };
+    var mk = function (o, i) {
+      return {
+        order: o.order, machines: o.machines, meta: o.meta, tag: o.tag, tagStyle: tagStyles[o.kind],
+        selId: "assign-" + i, suggested: "Suggested: " + o.suggested, why: o.why,
+        cardStyle: cardBase + "border-left:6px solid " + stripe[o.kind] + ";"
+      };
+    };
+    var orders = [
+      { order: "#4828", machines: [mach("Bobcat T76", "MT")], meta: "Ordered 7:31 AM", tag: "RUSH", kind: "rush", suggested: "Alissa · 3 open", why: "Lightest load, fastest first proof" },
+      { order: "R-0012 for #4802", machines: [mach("CAT 262D3", "GL")], meta: "Reprint · design error · logged 7:05 AM", tag: "REPRINT", kind: "reprint", suggested: "Andrew · 5 open", why: "Original designer fixes design errors" },
+      { order: "#4830", machines: [mach("CAT 305 CR", "GL"), mach("CAT 262D3", "CG")], meta: "Ordered 8:02 AM · 2 machines", tag: "2 MACHINES", kind: "split", suggested: "Bekah · 6 open", why: "Keeps both machines with one designer" },
+      { order: "#4827", machines: [mach("CAT 289D3", "GL")], meta: "Ordered 7:52 AM", tag: "", kind: "none", suggested: "Alissa · 3 open", why: "Lightest load" },
+      { order: "#4829", machines: [mach("Kubota SVL65-2", "PR")], meta: "Ordered Wed 4:40 PM", tag: "", kind: "none", suggested: "Cierra · 2 open", why: "Light load today" }
+    ].map(mk);
+
+    var seg = function (n, total, color) { return { style: "flex:0 0 " + (n / total * 100).toFixed(1) + "%;background:" + color + ";" }; };
+    var dt = "color:#3A4047;";
+    var dtWarn = "color:#A84C05;font-weight:600;";
+    var designers = [
+      { name: "Andrew", role: "Designer", work: 2, wait: 2, appr: 1, rush: 0, rev: 1, firstProof: "5h 10m" },
+      { name: "Alissa", role: "Designer", work: 1, wait: 1, appr: 1, rush: 0, rev: 0, firstProof: "4h 20m" },
+      { name: "Bekah", role: "Designer", work: 3, wait: 2, appr: 1, rush: 1, rev: 2, firstProof: "6h 05m" },
+      { name: "Cierra", role: "Team lead", work: 1, wait: 1, appr: 0, rush: 0, rev: 0, firstProof: "4h 45m" }
+    ].map(function (d) {
+      var total = d.work + d.wait + d.appr;
+      return {
+        name: d.name, role: d.role,
+        open: total + " open",
+        barLabel: d.name + ": " + d.work + " need work, " + d.wait + " waiting on customer, " + d.appr + " approved",
+        bar: [seg(d.work, total, "#1F6FD1"), seg(d.wait, total, "#8A94A0"), seg(d.appr, total, "#17803D")],
+        rows: [
+          { label: "Needs proof or revision", value: String(d.work), dtStyle: dt },
+          { label: "Waiting on customer", value: String(d.wait), dtStyle: dt },
+          { label: "Approved, needs print file", value: String(d.appr), dtStyle: dt },
+          { label: "Rush in hand", value: String(d.rush), dtStyle: d.rush ? dtWarn : dt }
+        ],
+        firstProof: d.firstProof
+      };
+    });
+
+    return { orders: orders, designers: designers };
+  }
+}
+</script>
+</body>
+</html>
