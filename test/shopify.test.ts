@@ -86,11 +86,37 @@ describe("ship-only orders and flags", () => {
     expect(m.shipItems.map((i) => i.title)).toEqual(["Application Kit"]);
   });
 
-  it("sends extra products to design when they're added to the settings", () => {
-    const decals = { ...shipOnlyShopifyOrder(), line_items: [{ id: 1, title: "Contractor Grade Decals", variant_title: "opc-Default Title", quantity: 10, properties: [] }] };
-    expect(mapShopifyOrder(decals).machines).toHaveLength(0);
-    const m = mapShopifyOrder(decals, { ...DEFAULT_INTAKE, otherDesignPatterns: ["decals"] });
-    expect(m.machines[0]).toMatchObject({ kind: "design", machine: "Contractor Grade Decals", kit: null, needsProof: true });
+  it("sends decals to design with proofs, keeping size and quantity but not prices", () => {
+    const decals = {
+      ...shipOnlyShopifyOrder(),
+      line_items: [
+        {
+          id: 1,
+          title: "Contractor Grade Decals",
+          variant_title: "opc-Default Title",
+          quantity: 10,
+          properties: [
+            { name: "_SKU", value: "opc-1" },
+            { name: "Finish", value: "Gravel Guard [$0.31]" },
+            { name: "Gravel Guard Sizing", value: "Height: 6in | Width: 8in [$48.00]" },
+          ],
+        },
+      ],
+    };
+    const m = mapShopifyOrder(decals);
+    expect(m.machines[0]).toMatchObject({ kind: "design", machine: "Contractor Grade Decals", kit: null, finish: "GG", needsProof: true });
+    expect(m.machines[0].selections).toEqual([
+      { name: "Gravel Guard Sizing", value: "Height: 6in | Width: 8in" },
+      { name: "Quantity", value: "10" },
+    ]);
+    expect(mapShopifyOrder(decals, { ...DEFAULT_INTAKE, otherDesignPatterns: [] }).machines).toHaveLength(0);
+  });
+
+  it("adds a matching Yeti as a print item with no proof, in its machine's finish", () => {
+    const order = sampleShopifyOrder();
+    order.line_items.push({ id: 9010, title: "Matching Wrapped Yeti", variant_title: "Silo Jug 1/2 Gal", price: "149.00", quantity: 1, properties: [] });
+    const yeti = mapShopifyOrder(order).machines.find((x) => x.kind === "matching")!;
+    expect(yeti).toMatchObject({ machine: "Matching Wrapped Yeti", kit: "Silo Jug 1/2 Gal", needsProof: false, finish: "MT" });
   });
 
   it("flags rush and dealer orders", () => {

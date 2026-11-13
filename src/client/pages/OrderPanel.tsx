@@ -5,7 +5,7 @@ import { day, dayTime, feet, full, hm, inches, PAYMENT_LABELS, plural, time } fr
 
 const METHOD_LABELS: Record<string, string> = {
   approve_pro: "In Approve Pro",
-  no_proof: "Sheetz, no proof needed",
+  matches_machine: "Uses the approved machine design",
   phone: "Phone call",
   in_person: "In person",
   text: "Text message",
@@ -97,7 +97,8 @@ function Timeline({ order }: { order: OrderDetail }) {
 // ---------- stage pill ----------
 
 function StagePill({ order }: { order: OrderDetail }) {
-  const approvedCount = order.machines.filter((m) => m.approvedAt).length;
+  const proofed = order.machines.filter((m) => m.needsProof);
+  const approvedCount = proofed.filter((m) => m.approvedAt).length;
   const lastApproval = [...order.timeline].reverse().find((e) => e.kind === "approved");
   switch (order.stage) {
     case "approved":
@@ -105,7 +106,7 @@ function StagePill({ order }: { order: OrderDetail }) {
     case "proof_sent":
       return (
         <span className="pill">
-          Waiting on customer{approvedCount ? ` · ${approvedCount} of ${order.machines.length} approved` : ""}
+          Waiting on customer{approvedCount ? ` · ${approvedCount} of ${proofed.length} approved` : ""}
         </span>
       );
     case "revision_requested":
@@ -126,7 +127,7 @@ function StagePill({ order }: { order: OrderDetail }) {
 // ---------- forms ----------
 
 function ManualDecision({ order, kind, onDone, onCancel }: { order: OrderDetail; kind: "approve" | "reject"; onDone: (o: OrderDetail) => void; onCancel: () => void }) {
-  const pending = order.machines.filter((m) => !m.approvedAt);
+  const pending = order.machines.filter((m) => !m.approvedAt && m.needsProof);
   const [method, setMethod] = useState("phone");
   const [note, setNote] = useState("");
   const [machineIds, setMachineIds] = useState<number[]>(pending.map((m) => m.id));
@@ -484,7 +485,7 @@ export function OrderPanel({ orderId, me, onChange }: { orderId: number; me: Me;
   };
 
   const canProof = ["needs_first_proof", "revision_requested", "proof_sent"].includes(order.stage);
-  const canDecide = ["proof_sent", "revision_requested", "needs_first_proof", "approved"].includes(order.stage) && order.machines.some((m) => !m.approvedAt);
+  const canDecide = ["proof_sent", "revision_requested", "needs_first_proof", "approved"].includes(order.stage) && order.machines.some((m) => !m.approvedAt && m.needsProof);
   const anyApproved = order.machines.some((m) => m.approvedAt);
   const closed = order.stage === "handed_off" || order.stage === "cancelled";
   const due = order.printFileDue;
@@ -693,6 +694,8 @@ export function OrderPanel({ orderId, me, onChange }: { orderId: number; me: Me;
                 <span className="machine-card__name">{m.machine}</span>
                 <span className="row">
                   {m.kind === "sheetz" && <span className="tag tag--custom">SHEETZ</span>}
+                  {m.kind === "design" && <span className="tag tag--custom">DECALS</span>}
+                  {m.kind === "matching" && <span className="tag tag--custom">MATCHES MACHINE · NO PROOF</span>}
                   <Chip code={m.finish} />
                 </span>
               </span>
@@ -703,7 +706,17 @@ export function OrderPanel({ orderId, me, onChange }: { orderId: number; me: Me;
                   <FragmentRow key={s.name} name={s.name} value={s.value} />
                 ))}
                 <dt>Status</dt>
-                <dd>{m.handedOffAt ? "With production" : !m.needsProof ? "No proof needed, print file due with the order" : m.approvedAt ? `Approved ${dayTime(m.approvedAt)}` : "Not approved yet"}</dd>
+                <dd>
+                  {m.handedOffAt
+                    ? "With production"
+                    : !m.needsProof
+                      ? m.approvedAt
+                        ? "Ready: uses the approved machine design"
+                        : "Prints after the machine design is approved"
+                      : m.approvedAt
+                        ? `Approved ${dayTime(m.approvedAt)}`
+                        : "Not approved yet"}
+                </dd>
               </dl>
             </div>
           ))}

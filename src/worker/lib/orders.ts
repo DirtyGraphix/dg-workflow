@@ -111,6 +111,7 @@ export async function intakeSettings(db: D1Database): Promise<IntakeSettings> {
     kitPatterns: listSetting(s.design_kit_patterns),
     sheetzPatterns: listSetting(s.design_sheetz_patterns),
     otherDesignPatterns: listSetting(s.design_other_patterns),
+    matchingPatterns: listSetting(s.design_matching_patterns),
   };
 }
 
@@ -284,12 +285,14 @@ export async function assignOrder(db: D1Database, orderId: number, assigneeId: n
     }),
   ];
   if (order.stage === "unassigned") {
-    // Sheetz don't get customer proofs: their print file clock starts when a designer has them.
+    // Items without proofs (matching Yetis) follow their machine's approval. Only an order with nothing
+    // to proof starts out approved.
     const machines = await getMachines(db, orderId);
-    const noProof = machines.filter((m) => !m.needs_proof && !m.approved_at);
-    stmts.push(...noProof.map((m) => db.prepare("UPDATE machines SET approved_at = ?, approval_method = 'no_proof' WHERE id = ?").bind(at, m.id)));
-    const allApproved = machines.length > 0 && machines.every((m) => m.approved_at || !m.needs_proof);
-    stmts.push(setStage(db, orderId, allApproved ? "approved" : "needs_first_proof", at));
+    const nothingToProof = machines.length > 0 && machines.every((m) => !m.needs_proof);
+    if (nothingToProof) {
+      stmts.push(...machines.filter((m) => !m.approved_at).map((m) => db.prepare("UPDATE machines SET approved_at = ?, approval_method = 'matches_machine' WHERE id = ?").bind(at, m.id)));
+    }
+    stmts.push(setStage(db, orderId, nothingToProof ? "approved" : "needs_first_proof", at));
   }
   await db.batch(stmts);
 }
@@ -336,14 +339,21 @@ export async function recordApproval(
   if (!input.note?.trim()) throw new WorkflowError("Add a note on what the customer said");
   if (["unassigned", "handed_off", "cancelled"].includes(order.stage)) throw new WorkflowError("This order can't be approved now", 409);
   const machines = await getMachines(db, orderId);
-  const targets = input.machineIds?.length ? machines.filter((m) => input.machineIds!.includes(m.id)) : machines;
+  const proofed = machines.filter((m) => m.needs_proof);
+  const targets = input.machineIds?.length ? proofed.filter((m) => input.machineIds!.includes(m.id)) : proofed;
   if (!targets.length) throw new WorkflowError("No machines to approve");
   const at = now();
   const stmts: D1PreparedStatement[] = targets
     .filter((m) => !m.approved_at)
     .map((m) => db.prepare("UPDATE machines SET approved_at = ?, approval_method = ? WHERE id = ?").bind(at, input.method, m.id));
-  const approvedIds = new Set([...machines.filter((m) => m.approved_at).map((m) => m.id), ...targets.map((m) => m.id)]);
-  const allApproved = machines.every((m) => approvedIds.has(m.id));
+  const approvedIds = new Set([...proofed.filter((m) => m.approved_at).map((m) => m.id), ...targets.map((m) => m.id)]);
+  const allApproved = proofed.every((m) => approvedIds.has(m.id));
+  // Once every proofed design is approved, matching items (Yetis) are approved with them.
+  if (allApproved) {
+    for (const m of machines.filter((x) => !x.needs_proof && !x.approved_at)) {
+      stmts.push(db.prepare("UPDATE machines SET approved_at = ?, approval_method = 'matches_machine' WHERE id = ?").bind(at, m.id));
+    }
+  }
   if (allApproved) stmts.push(setStage(db, orderId, "approved", at));
   if (input.method === "approve_pro") stmts.push(db.prepare("UPDATE orders SET in_approve_pro = 1 WHERE id = ?").bind(orderId));
   stmts.push(

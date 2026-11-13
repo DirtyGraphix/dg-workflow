@@ -25,7 +25,7 @@ export async function api<T = any>(method: string, path: string, body?: unknown)
 
 export type FinishCode = "GL" | "MT" | "GG" | "CG" | "PR" | "CM" | "CP";
 export type Stage = "unassigned" | "needs_first_proof" | "proof_sent" | "revision_requested" | "approved" | "handed_off" | "ship_only" | "cancelled";
-export type JobKind = "kit" | "sheetz" | "design";
+export type JobKind = "kit" | "sheetz" | "design" | "matching";
 export type Role = "admin" | "lead" | "billing" | "designer" | "production" | "kits" | "listings";
 
 export interface Me {

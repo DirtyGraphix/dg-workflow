@@ -68,7 +68,8 @@ CREATE TABLE machines (
   order_id         INTEGER NOT NULL REFERENCES orders(id),
   shopify_line_id  TEXT,
   position         INTEGER NOT NULL DEFAULT 0,
-  kind             TEXT NOT NULL DEFAULT 'kit' CHECK (kind IN ('kit','sheetz','design')),
+  kind             TEXT NOT NULL DEFAULT 'kit' CHECK (kind IN ('kit','sheetz','design','matching')),
+  -- matching: e.g. a Matching Wrapped Yeti. Printed at the end of the run using the approved machine design; never proofed.
   needs_proof      INTEGER NOT NULL DEFAULT 1, -- every design job gets customer proofs today; 0 would skip straight to print file
   machine          TEXT NOT NULL,        -- "John Deere 325G"
   kit              TEXT,                 -- "Full wrap kit"
@@ -77,7 +78,7 @@ CREATE TABLE machines (
   quarter_length_in REAL,                -- entered by design at 1/4 scale
   length_reason    TEXT,                 -- answer to the "are you sure" length check
   approved_at      TEXT,
-  approval_method  TEXT,                 -- proof_page, approve_pro, phone, in_person, text, email, other
+  approval_method  TEXT,                 -- proof_page, approve_pro, phone, in_person, text, email, other, matches_machine
   handed_off_at    TEXT,
   handed_off_by    INTEGER REFERENCES people(id)
 );
@@ -152,4 +153,6 @@ INSERT INTO settings (key, value) VALUES
   -- Line items whose title matches one of these go to design. Everything else ships as-is.
   ('design_kit_patterns', 'wrap kit'),
   ('design_sheetz_patterns', 'sheetz'),
-  ('design_other_patterns', '');
+  ('design_other_patterns', 'decals'),
+  -- Printed with the order using the approved machine design, no proof of its own.
+  ('design_matching_patterns', 'matching wrapped');

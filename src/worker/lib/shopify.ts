@@ -8,6 +8,9 @@
 //   line items linked to the kit by "_gpo_parent_product_group" (e.g. "Finish", "Application Kit").
 // - Sheetz arrive as option lines ("Sheetz Size" 4x4) with their finish on a separate line ("4x4 Finishes").
 //   They are their own design job and get customer proofs like wrap kits.
+// - Contractor Grade Decals are designed and proofed.
+// - Matching Wrapped Yetis are printed at the end of the run with the approved machine design.
+//   They need a print length but no proof, and the customer never sees them.
 // - Application kits, ADHESOFF, apparel and similar products skip design and just ship.
 //
 // Hard rule: no price, total or amount is ever copied out of the Shopify payload. Option values like
@@ -59,8 +62,10 @@ export interface IntakeSettings {
   kitPatterns: string[];
   /** Line item titles that are Sheetz (their own design job, proofed like wrap kits). */
   sheetzPatterns: string[];
-  /** Other products that need design with proofs. */
+  /** Other products that need design with proofs (e.g. decals). */
   otherDesignPatterns: string[];
+  /** Printed with the order using the approved machine design, no proof (e.g. matching Yetis). */
+  matchingPatterns: string[];
 }
 
 export const DEFAULT_INTAKE: IntakeSettings = {
@@ -69,10 +74,11 @@ export const DEFAULT_INTAKE: IntakeSettings = {
   customTags: ["custom-one-off"],
   kitPatterns: ["wrap kit"],
   sheetzPatterns: ["sheetz"],
-  otherDesignPatterns: [],
+  otherDesignPatterns: ["decals"],
+  matchingPatterns: ["matching wrapped"],
 };
 
-export type JobKind = "kit" | "sheetz" | "design";
+export type JobKind = "kit" | "sheetz" | "design" | "matching";
 
 export interface MappedMachine {
   shopifyLineId: string;
@@ -148,7 +154,7 @@ function prop(item: Shopify, key: string): string | null {
 }
 const variantSegments = (item: Shopify): string[] =>
   String(item.variant_title ?? "")
-    .split("/")
+    .split(" / ") // Shopify joins options with " / "; values like "1/2 Gal" keep their slash
     .map((s) => s.trim())
     .filter((s) => s && !/default title$/i.test(s));
 const isRushItem = (item: Shopify) => /\brush\b/i.test(`${item.title ?? ""} ${item.variant_title ?? ""}`);
@@ -169,7 +175,7 @@ function kitIdentity(item: Shopify, kind: JobKind): { machine: string; kit: stri
   const title = clean(item.title) ?? "Unknown";
   const segs = variantSegments(item);
   if (kind === "sheetz") return { machine: `Sheetz${segs.length ? ` ${segs.join(" / ")}` : ""}`, kit: "Sheetz" };
-  if (kind === "design") return { machine: title, kit: segs.length ? segs.join(" / ") : null };
+  if (kind === "design" || kind === "matching") return { machine: title, kit: segs.length ? segs.join(" / ") : null };
   const model = segs.find((s) => MODEL_CODE.test(s));
   if (model) {
     // Limited-edition kits: the variant is the machine model and the product is the kit.
@@ -223,7 +229,9 @@ export function mapShopifyOrder(o: Shopify, settings: IntakeSettings = DEFAULT_I
       continue;
     }
     if (isRushItem(item)) continue;
-    const kind: JobKind | null = matches(title, settings.sheetzPatterns)
+    const kind: JobKind | null = matches(title, settings.matchingPatterns)
+      ? "matching"
+      : matches(title, settings.sheetzPatterns)
       ? "sheetz"
       : matches(title, settings.kitPatterns)
         ? "kit"
@@ -240,11 +248,11 @@ export function mapShopifyOrder(o: Shopify, settings: IntakeSettings = DEFAULT_I
     const machine: MappedMachine = {
       shopifyLineId: String(item.id),
       kind,
-      needsProof: true,
+      needsProof: kind !== "matching",
       machine: id.machine,
       kit: id.kit,
       finish: parseFinish(finishProp ? stripPrices(finishProp) : null) ?? (kind === "kit" ? parseFinish(item.variant_title) ?? parseFinish(title) : null),
-      selections: selectionsFor(item),
+      selections: [...selectionsFor(item), ...(Number(item.quantity ?? 1) > 1 ? [{ name: "Quantity", value: String(item.quantity) }] : [])],
     };
     const group = prop(item, "_gpo_product_group");
     if (group) byGroup.set(group, machine);
@@ -275,6 +283,10 @@ export function mapShopifyOrder(o: Shopify, settings: IntakeSettings = DEFAULT_I
     const target = machines.find((m) => m.kind === "sheetz" && !m.finish) ?? machines.find((m) => !m.finish);
     if (target) target.finish = parseFinish(line.variant_title);
   }
+
+  // Matching items (Yetis) print in the finish of the machine they match.
+  const firstKit = machines.find((m) => m.kind === "kit" && m.finish);
+  for (const m of machines) if (m.kind === "matching" && !m.finish && firstKit) m.finish = firstKit.finish;
 
   const uploads: { name: string; url: string }[] = [];
   for (const item of items) {

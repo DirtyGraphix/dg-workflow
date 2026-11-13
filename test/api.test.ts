@@ -204,6 +204,31 @@ describe("Sheetz and ship-only orders", () => {
   });
 });
 
+describe("matching Yetis", () => {
+  it("approves the Yeti along with the last machine design and needs its own length", async () => {
+    const order = sampleShopifyOrder({ id: 5550009, name: "514860009" });
+    order.line_items.push({ id: 9910, title: "Matching Wrapped Yeti", variant_title: "Silo Jug 1/2 Gal", price: "149.00", quantity: 1, properties: [] });
+    await sendWebhook("orders/create", order);
+    const board = await cierra.req("GET", "/api/assign");
+    const id = board.json.unassigned.find((u: Json) => u.order.orderNumber === "514860009").order.id;
+    await cierra.req("POST", `/api/orders/${id}/assign`, { personId: alissaId });
+    let d = await alissa.req("GET", `/api/orders/${id}`);
+    const [bobcat, jcb, yeti] = d.json.machines;
+    expect(yeti).toMatchObject({ kind: "matching", needsProof: false, approvedAt: null });
+    d = await alissa.req("POST", `/api/orders/${id}/approve`, { machineIds: [bobcat.id], method: "phone", note: "Bobcat approved" });
+    expect(d.json.machines[2].approvedAt).toBeNull();
+    d = await alissa.req("POST", `/api/orders/${id}/approve`, { machineIds: [jcb.id], method: "phone", note: "JCB approved" });
+    expect(d.json.stage).toBe("approved");
+    expect(d.json.machines[2].approvalMethod).toBe("matches_machine");
+    await alissa.req("POST", `/api/orders/${id}/checklist`, { itemIds: d.json.checklist.items.map((i: Json) => i.id) });
+    await alissa.req("PUT", `/api/machines/${bobcat.id}/length`, { quarterLength: 150 });
+    await alissa.req("PUT", `/api/machines/${jcb.id}/length`, { quarterLength: 120 });
+    expect((await alissa.req("POST", `/api/orders/${id}/hand-off`, {})).status).toBe(409);
+    await alissa.req("PUT", `/api/machines/${yeti.id}/length`, { quarterLength: 8 });
+    expect((await alissa.req("POST", `/api/orders/${id}/hand-off`, {})).json.allDone).toBe(true);
+  });
+});
+
 describe("manual jobs and print file pauses", () => {
   it("creates a manual job with its machines", async () => {
     const res = await cierra.req("POST", "/api/orders/manual", {
