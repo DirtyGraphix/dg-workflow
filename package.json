@@ -3,15 +3,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite build && wrangler dev",
+    "dev": "vite build && wrangler d1 migrations apply dg-workflow --local && wrangler dev",
     "build": "vite build",
-    "db:migrate:local": "wrangler d1 migrations apply dg-workflow --local",
-    "db:seed:local": "wrangler d1 execute dg-workflow --local --file=seed/dev-seed.sql",
-    "deploy": "vite build && wrangler deploy",
-    "test": "vitest run",
+    "seed:dev": "node scripts/dev-seed.mjs",
+    "deploy": "vite build && wrangler d1 migrations apply dg-workflow --remote && wrangler deploy",
+    "test": "vite build && vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fontsource/barlow-condensed": "5.3.0",
+    "@fontsource/inter": "5.3.0",
     "hono": "4.13.14",
     "react": "19.3.1",
     "react-dom": "19.3.1",
