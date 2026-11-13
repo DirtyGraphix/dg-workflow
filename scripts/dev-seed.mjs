@@ -44,7 +44,18 @@ async function webhook(order) {
 
 const hoursAgo = (h) => new Date(Date.now() - h * 3600_000).toISOString();
 let lineId = 100;
-const item = (title, variant, props = []) => ({ id: ++lineId, title, variant_title: variant, properties: props });
+// Shaped like real orders: "... Wrap Kits" products, choices as properties, option lines linked by group id.
+const kit = (title, variant, finish, props = []) => {
+  const group = String(++lineId);
+  return [
+    { id: lineId, title, variant_title: variant, quantity: 1, properties: [{ name: "Finish Options", value: finish }, ...props, { name: "_gpo_product_group", value: group }] },
+  ];
+};
+const appKit = (parent) => ({ id: ++lineId, title: "Application Kit", sku: "appkit", quantity: 1, properties: parent ? [{ name: "_gpo_parent_product_group", value: parent }] : [] });
+const sheetz = (size, finish) => [
+  { id: ++lineId, title: "Sheetz Size", variant_title: size, quantity: 1, properties: [] },
+  { id: ++lineId, title: `${size} Finishes`, variant_title: finish, quantity: 1, properties: [] },
+];
 const order = (n, hours, items, extra = {}) => ({
   id: 7000000 + n,
   name: `#${n}`,
@@ -78,16 +89,17 @@ for (const [name, role, takesOrders] of team) {
   await clients[name].req("POST", "/api/login", { email, password: PASSWORD });
 }
 
-const design = (props) => [{ name: "Design", value: "Stripe Pack 2" }, { name: "Colors", value: "Black, Safety Orange" }, ...props];
+const choices = [{ name: "Year", value: "2024" }, { name: "Base", value: "Black" }, { name: "Accent 1", value: "Safety Orange" }];
 const orders = [
-  order(4820, 50, [item("John Deere 325G", "Full wrap kit / Chrome Gloss", design([{ name: "_logo", value: "https://example.com/logo.png" }])), item("CAT 259D3", "Full wrap kit / Gloss", design([]))], { note: "Company name on both cab doors.", company: "R. Hanson Excavating" }),
-  order(4826, 2, [item("CAT 299D3", "Full wrap kit / Gravel Guard", design([]))], { tags: "rush" }),
-  order(4825, 5, [item("Bobcat T66", "Full wrap kit / Gloss", design([]))]),
-  order(4818, 30, [item("Kubota SVL97-2", "Full wrap kit / Matte", design([]))]),
-  order(4814, 60, [item("CAT 308 CR", "Full wrap kit / Prismatic", design([]))]),
-  order(4828, 1, [item("Bobcat T76", "Full wrap kit / Matte", design([]))], { tags: "rush" }),
-  order(4830, 1, [item("CAT 305 CR", "Full wrap kit / Gloss", design([])), item("CAT 262D3", "Full wrap kit / Chrome Gloss", design([]))]),
-  order(4827, 2, [item("CAT 289D3", "Full wrap kit / Gloss", design([]))]),
+  order(4820, 50, [...kit("2024+ John Deere 325G Wrap Kits", "STRIPE PACK 2 / Full (Pictured)", "Chrome Gloss", [...choices, { name: "Logo Upload-1", value: "https://example.com/logo.ai" }]), ...kit("CAT 259D3 Wrap Kits", "STRIPE PACK 2 / Full (Pictured)", "Gloss", choices), appKit(String(lineId - 1))], { note: "Company name on both cab doors.", company: "R. Hanson Excavating" }),
+  order(4826, 2, kit("CAT 299D3 Wrap Kits", "DIGITAL_CAMO", "Gravel Guard [$0.31]", choices), { tags: "rush" }),
+  order(4825, 5, kit("Bobcat T66 Wrap Kits", "STRIPE PACK 1", "Gloss", choices)),
+  order(4818, 30, kit("Kubota SVL97-2 Wrap Kits", "CUSTOM ONE-OFF / Full (Pictured)", "Matte", choices)),
+  order(4814, 60, kit("CAT 308 CR Wrap Kits", "STRIPE PACK 2", "Prismatic", choices)),
+  order(4828, 1, kit("Bobcat T76 Wrap Kits", "STRIPE PACK 1", "Matte", choices), { tags: "rush" }),
+  order(4830, 1, [...kit("GRAVEL GUARD BLACKOUT - Kubota Limited Edition Wrap Kits", "SVL110-3", "Gravel Guard"), ...sheetz("4x4", "Gravel Guard")]),
+  order(4827, 2, kit("CAT 289D3 Wrap Kits", "STRIPE PACK 2", "Gloss", choices)),
+  order(4831, 1, [appKit(null)]),
 ];
 const orderIds = {};
 for (const o of orders) orderIds[o.order_number] = (await webhook(o)).id;

@@ -24,7 +24,8 @@ export async function api<T = any>(method: string, path: string, body?: unknown)
 }
 
 export type FinishCode = "GL" | "MT" | "GG" | "CG" | "PR" | "CM" | "CP";
-export type Stage = "unassigned" | "needs_first_proof" | "proof_sent" | "revision_requested" | "approved" | "handed_off" | "cancelled";
+export type Stage = "unassigned" | "needs_first_proof" | "proof_sent" | "revision_requested" | "approved" | "handed_off" | "ship_only" | "cancelled";
+export type JobKind = "kit" | "sheetz" | "design";
 export type Role = "admin" | "lead" | "billing" | "designer" | "production" | "kits" | "listings";
 
 export interface Me {
@@ -46,7 +47,7 @@ export interface OrderSummary {
   isDealer: boolean;
   isCustom: boolean;
   assignedTo: number | null;
-  machines: { id: number; machine: string; finish: FinishCode | null }[];
+  machines: { id: number; machine: string; finish: FinishCode | null; kind: JobKind }[];
   printFileDue: string | null;
   printFilePaused: boolean;
 }
@@ -72,6 +73,8 @@ export interface QueueResponse {
 
 export interface MachineView {
   id: number;
+  kind: JobKind;
+  needsProof: boolean;
   machine: string;
   kit: string | null;
   finish: FinishCode | null;
@@ -110,6 +113,7 @@ export interface OrderDetail extends OrderSummary {
   checklist: { items: { id: number; label: string }[]; signedBy: string | null; signedAt: string | null };
   productionNote: string | null;
   machines: MachineView[];
+  shipItems: { title: string; variant: string | null; quantity: number; attachedTo: number | null }[];
   timeline: TimelineEvent[];
 }
 

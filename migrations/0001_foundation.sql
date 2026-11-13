@@ -45,7 +45,8 @@ CREATE TABLE orders (
   custom_reason     TEXT,                   -- why it was marked custom (tag, product name, or a person's note)
   stage             TEXT NOT NULL DEFAULT 'unassigned' CHECK (stage IN (
                       'unassigned','needs_first_proof','proof_sent','revision_requested',
-                      'approved','handed_off','cancelled')),
+                      'approved','handed_off','ship_only','cancelled')),
+                      -- ship_only: nothing on the order needs design (application kits, apparel), so it goes straight to production
   stage_since       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   assigned_to       INTEGER REFERENCES people(id),
   assigned_at       TEXT,
@@ -67,6 +68,8 @@ CREATE TABLE machines (
   order_id         INTEGER NOT NULL REFERENCES orders(id),
   shopify_line_id  TEXT,
   position         INTEGER NOT NULL DEFAULT 0,
+  kind             TEXT NOT NULL DEFAULT 'kit' CHECK (kind IN ('kit','sheetz','design')),
+  needs_proof      INTEGER NOT NULL DEFAULT 1, -- every design job gets customer proofs today; 0 would skip straight to print file
   machine          TEXT NOT NULL,        -- "John Deere 325G"
   kit              TEXT,                 -- "Full wrap kit"
   finish           TEXT CHECK (finish IN ('GL','MT','GG','CG','PR','CM','CP')),
@@ -80,6 +83,18 @@ CREATE TABLE machines (
 );
 CREATE INDEX machines_order ON machines(order_id);
 CREATE INDEX machines_model ON machines(machine, kit);
+
+-- Things on the order that skip design and just ship: application kits, apparel, ADHESOFF.
+CREATE TABLE order_items (
+  id               INTEGER PRIMARY KEY,
+  order_id         INTEGER NOT NULL REFERENCES orders(id),
+  shopify_line_id  TEXT,
+  title            TEXT NOT NULL,
+  variant          TEXT,
+  quantity         INTEGER NOT NULL DEFAULT 1,
+  attached_to      INTEGER REFERENCES machines(id) -- e.g. an application kit added to a wrap kit
+);
+CREATE INDEX order_items_order ON order_items(order_id);
 
 -- Every step on an order, for the timeline and for turnaround stats.
 CREATE TABLE events (
@@ -133,4 +148,8 @@ INSERT INTO settings (key, value) VALUES
   ('length_check_min_samples', '3'),
   ('rush_tags', 'rush'),
   ('dealer_tags', 'dealer,dealer-b2b'),
-  ('custom_tags', 'custom-one-off');
+  ('custom_tags', 'custom-one-off'),
+  -- Line items whose title matches one of these go to design. Everything else ships as-is.
+  ('design_kit_patterns', 'wrap kit'),
+  ('design_sheetz_patterns', 'sheetz'),
+  ('design_other_patterns', '');

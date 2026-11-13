@@ -10,7 +10,7 @@ import {
   type ClockOptions,
 } from "./businessTime";
 import type { Person } from "./auth";
-import type { FinishCode, MappedOrder } from "./shopify";
+import type { FinishCode, IntakeSettings, JobKind, MappedOrder } from "./shopify";
 
 export class WorkflowError extends Error {
   constructor(
@@ -29,6 +29,7 @@ export type Stage =
   | "revision_requested"
   | "approved"
   | "handed_off"
+  | "ship_only"
   | "cancelled";
 
 export interface OrderRow {
@@ -71,6 +72,8 @@ export interface MachineRow {
   order_id: number;
   shopify_line_id: string | null;
   position: number;
+  kind: JobKind;
+  needs_proof: number;
   machine: string;
   kit: string | null;
   finish: FinishCode | null;
@@ -99,9 +102,16 @@ export async function clockFor(env: Env): Promise<ClockOptions> {
 
 const listSetting = (v: string | undefined) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 
-export async function intakeSettings(db: D1Database) {
+export async function intakeSettings(db: D1Database): Promise<IntakeSettings> {
   const s = await getSettings(db);
-  return { rushTags: listSetting(s.rush_tags), dealerTags: listSetting(s.dealer_tags), customTags: listSetting(s.custom_tags) };
+  return {
+    rushTags: listSetting(s.rush_tags),
+    dealerTags: listSetting(s.dealer_tags),
+    customTags: listSetting(s.custom_tags),
+    kitPatterns: listSetting(s.design_kit_patterns),
+    sheetzPatterns: listSetting(s.design_sheetz_patterns),
+    otherDesignPatterns: listSetting(s.design_other_patterns),
+  };
 }
 
 /** Business days a designer has to finish the print file after approval. */
@@ -171,12 +181,25 @@ export async function ingestShopifyOrder(db: D1Database, m: MappedOrder): Promis
     )
     .first<{ id: number }>();
   const id = row!.id;
+  const shipOnly = m.machines.length === 0;
   const stmts = m.machines.map((mc, i) =>
     db
-      .prepare("INSERT INTO machines (order_id, shopify_line_id, position, machine, kit, finish, selections_json) VALUES (?, ?, ?, ?, ?, ?, ?)")
-      .bind(id, mc.shopifyLineId, i, mc.machine, mc.kit, mc.finish, JSON.stringify(mc.selections)),
+      .prepare("INSERT INTO machines (order_id, shopify_line_id, position, kind, needs_proof, machine, kit, finish, selections_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .bind(id, mc.shopifyLineId, i, mc.kind, mc.needsProof ? 1 : 0, mc.machine, mc.kit, mc.finish, JSON.stringify(mc.selections)),
+  );
+  stmts.push(
+    ...m.shipItems.map((it) =>
+      db
+        .prepare(
+          `INSERT INTO order_items (order_id, shopify_line_id, title, variant, quantity, attached_to)
+           VALUES (?, ?, ?, ?, ?, (SELECT id FROM machines WHERE order_id = ? AND shopify_line_id = ?))`,
+        )
+        .bind(id, it.shopifyLineId, it.title, it.variant, it.quantity, id, it.attachedToLineId),
+    ),
   );
   stmts.push(addEvent(db, { orderId: id, kind: "received", note: "From Shopify", at: m.orderedAt }));
+  // Nothing to design (application kits, apparel): it goes straight to production to ship.
+  if (shipOnly) stmts.push(setStage(db, id, "ship_only", m.orderedAt), addEvent(db, { orderId: id, kind: "ship_only", note: "Nothing to design. Sent to production to ship." }));
   await db.batch(stmts);
   return { id, created: true };
 }
@@ -243,7 +266,7 @@ export async function createManualJob(db: D1Database, by: Person, input: ManualJ
 
 export async function assignOrder(db: D1Database, orderId: number, assigneeId: number, by: Person) {
   const order = await getOrder(db, orderId);
-  if (order.stage === "cancelled" || order.stage === "handed_off") throw new WorkflowError("This order is closed", 409);
+  if (order.stage === "cancelled" || order.stage === "handed_off" || order.stage === "ship_only") throw new WorkflowError("This order has nothing waiting on design", 409);
   const assignee = await db
     .prepare("SELECT id, name FROM people WHERE id = ? AND active = 1 AND takes_orders = 1")
     .bind(assigneeId)
@@ -260,7 +283,14 @@ export async function assignOrder(db: D1Database, orderId: number, assigneeId: n
       data: { to: assignee.id, from: order.assigned_to },
     }),
   ];
-  if (order.stage === "unassigned") stmts.push(setStage(db, orderId, "needs_first_proof", at));
+  if (order.stage === "unassigned") {
+    // Sheetz don't get customer proofs: their print file clock starts when a designer has them.
+    const machines = await getMachines(db, orderId);
+    const noProof = machines.filter((m) => !m.needs_proof && !m.approved_at);
+    stmts.push(...noProof.map((m) => db.prepare("UPDATE machines SET approved_at = ?, approval_method = 'no_proof' WHERE id = ?").bind(at, m.id)));
+    const allApproved = machines.length > 0 && machines.every((m) => m.approved_at || !m.needs_proof);
+    stmts.push(setStage(db, orderId, allApproved ? "approved" : "needs_first_proof", at));
+  }
   await db.batch(stmts);
 }
 
@@ -498,6 +528,8 @@ export async function resumePrintFile(db: D1Database, orderId: number, by: Perso
 
 export interface MachineView {
   id: number;
+  kind: JobKind;
+  needsProof: boolean;
   machine: string;
   kit: string | null;
   finish: FinishCode | null;
@@ -522,7 +554,7 @@ export interface OrderSummary {
   isDealer: boolean;
   isCustom: boolean;
   assignedTo: number | null;
-  machines: { id: number; machine: string; finish: FinishCode | null }[];
+  machines: { id: number; machine: string; finish: FinishCode | null; kind: JobKind }[];
   printFileDue: string | null;
   printFilePaused: boolean;
 }
@@ -540,7 +572,7 @@ function summarize(o: OrderRow, machines: MachineRow[], clock: ClockOptions): Or
     isDealer: !!o.is_dealer,
     isCustom: !!o.is_custom,
     assignedTo: o.assigned_to,
-    machines: machines.map((m) => ({ id: m.id, machine: m.machine, finish: m.finish })),
+    machines: machines.map((m) => ({ id: m.id, machine: m.machine, finish: m.finish, kind: m.kind })),
     printFileDue: dues[0] ?? null,
     printFilePaused: !!o.print_file_paused_at,
   };
@@ -610,6 +642,10 @@ export async function orderDetail(env: Env, orderId: number) {
     )
     .bind(orderId)
     .all<{ id: number; kind: string; at: string; note: string | null; data_json: string | null; machine_id: number | null; person: string | null }>();
+  const { results: shipItems } = await env.DB
+    .prepare("SELECT title, variant, quantity, attached_to AS attachedTo FROM order_items WHERE order_id = ? ORDER BY id")
+    .bind(orderId)
+    .all<{ title: string; variant: string | null; quantity: number; attachedTo: number | null }>();
   const { results: checklist } = await env.DB
     .prepare("SELECT id, label FROM checklist_items WHERE active = 1 ORDER BY sort, id")
     .all<{ id: number; label: string }>();
@@ -631,6 +667,8 @@ export async function orderDetail(env: Env, orderId: number) {
 
   const machineViews: MachineView[] = machines.map((m) => ({
     id: m.id,
+    kind: m.kind,
+    needsProof: !!m.needs_proof,
     machine: m.machine,
     kit: m.kit,
     finish: m.finish,
@@ -671,6 +709,7 @@ export async function orderDetail(env: Env, orderId: number) {
     },
     productionNote: o.production_note,
     machines: machineViews,
+    shipItems,
     timeline,
   };
 }

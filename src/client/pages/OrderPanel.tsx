@@ -5,6 +5,7 @@ import { day, dayTime, feet, full, hm, inches, PAYMENT_LABELS, plural, time } fr
 
 const METHOD_LABELS: Record<string, string> = {
   approve_pro: "In Approve Pro",
+  no_proof: "Sheetz, no proof needed",
   phone: "Phone call",
   in_person: "In person",
   text: "Text message",
@@ -49,6 +50,8 @@ function timelineLabel(e: TimelineEvent, order: OrderDetail, proofIndex: number)
       return `Print file deadline resumed · ${hm(e.data?.pausedMinutes ?? 0)} added`;
     case "cancelled":
       return "Cancelled";
+    case "ship_only":
+      return "Sent to production to ship";
     default:
       return e.kind;
   }
@@ -113,6 +116,8 @@ function StagePill({ order }: { order: OrderDetail }) {
       return <span className="pill pill--success">With production</span>;
     case "cancelled":
       return <span className="pill pill--danger">Cancelled in Shopify</span>;
+    case "ship_only":
+      return <span className="pill">Nothing to design · ships from production</span>;
     default:
       return <span className="pill">Not assigned yet</span>;
   }
@@ -646,6 +651,16 @@ export function OrderPanel({ orderId, me, onChange }: { orderId: number; me: Me;
                 <dd>{order.customReason}</dd>
               </>
             )}
+            {order.shipItems.length > 0 && (
+              <>
+                <dt>Also ships</dt>
+                <dd>
+                  {order.shipItems
+                    .map((i) => `${i.title}${i.variant ? ` (${i.variant})` : ""}${i.quantity > 1 ? ` ×${i.quantity}` : ""}`)
+                    .join(", ")}
+                </dd>
+              </>
+            )}
           </dl>
           <button type="button" className="btn btn--link" style={{ alignSelf: "flex-start", minHeight: 40 }} aria-expanded={contactOpen} onClick={() => setContactOpen(!contactOpen)}>
             {contactOpen ? "Hide contact and shipping" : "Show contact and shipping"}
@@ -676,7 +691,10 @@ export function OrderPanel({ orderId, me, onChange }: { orderId: number; me: Me;
             <div key={m.id} className="machine-card" style={{ "--finish-color": finishVar(m.finish) } as CSSProperties}>
               <span className="machine-card__top">
                 <span className="machine-card__name">{m.machine}</span>
-                <Chip code={m.finish} />
+                <span className="row">
+                  {m.kind === "sheetz" && <span className="tag tag--custom">SHEETZ</span>}
+                  <Chip code={m.finish} />
+                </span>
               </span>
               <dl className="dl">
                 <dt>Kit</dt>
@@ -685,7 +703,7 @@ export function OrderPanel({ orderId, me, onChange }: { orderId: number; me: Me;
                   <FragmentRow key={s.name} name={s.name} value={s.value} />
                 ))}
                 <dt>Status</dt>
-                <dd>{m.handedOffAt ? "With production" : m.approvedAt ? `Approved ${dayTime(m.approvedAt)}` : "Not approved yet"}</dd>
+                <dd>{m.handedOffAt ? "With production" : !m.needsProof ? "No proof needed, print file due with the order" : m.approvedAt ? `Approved ${dayTime(m.approvedAt)}` : "Not approved yet"}</dd>
               </dl>
             </div>
           ))}

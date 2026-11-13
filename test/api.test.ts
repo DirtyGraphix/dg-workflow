@@ -1,6 +1,6 @@
 import { env, SELF } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
-import { sampleShopifyOrder, signWebhook } from "./fixtures";
+import { sampleShopifyOrder, sheetzShopifyOrder, shipOnlyShopifyOrder, signWebhook } from "./fixtures";
 
 type Json = Record<string, any>;
 
@@ -119,11 +119,14 @@ describe("an order from intake to hand-off", () => {
     const d = await alissa.req("GET", `/api/orders/${orderId}`);
     expect(d.status).toBe(200);
     const text = JSON.stringify(d.json);
-    for (const amount of ["1890", "1850", "1100", "750"]) expect(text).not.toContain(amount);
+    for (const amount of ["3890", "3850", "1999", "1499", "69.95", "0.31", "$"]) expect(text).not.toContain(amount);
     expect(text).not.toMatch(/price/i);
     expect(d.json.paymentStatus).toBe("paid");
     machineIds = d.json.machines.map((m: Json) => m.id);
-    expect(d.json.machines.map((m: Json) => m.finish)).toEqual(["CG", "GL"]);
+    expect(d.json.machines.map((m: Json) => m.finish)).toEqual(["MT", "GG"]);
+    expect(d.json.shipItems.map((i: Json) => i.title)).toEqual(["ADHESOFF™", "Application Kit"]);
+    expect(d.json.isCustom).toBe(true);
+    expect(d.json.printFileDays).toBe(5);
   });
 
   it("moves through proof, change request and partial approval", async () => {
@@ -132,11 +135,11 @@ describe("an order from intake to hand-off", () => {
     expect(d.json.stage).toBe("revision_requested");
     await alissa.req("POST", `/api/orders/${orderId}/proof-sent`, { via: "approve_pro" });
     expect((await alissa.req("POST", `/api/orders/${orderId}/approve`, { method: "phone", note: "" })).status).toBe(400);
-    d = await alissa.req("POST", `/api/orders/${orderId}/approve`, { machineIds: [machineIds[0]], method: "phone", note: "Approved the Deere on the phone" });
+    d = await alissa.req("POST", `/api/orders/${orderId}/approve`, { machineIds: [machineIds[0]], method: "phone", note: "Approved the Bobcat on the phone" });
     expect(d.json.stage).toBe("proof_sent");
     expect(d.json.machines[0].printFileDue).toBeTruthy();
     expect(d.json.machines[1].printFileDue).toBeNull();
-    d = await alissa.req("POST", `/api/orders/${orderId}/approve`, { machineIds: [machineIds[1]], method: "text", note: "Approved the CAT by text" });
+    d = await alissa.req("POST", `/api/orders/${orderId}/approve`, { machineIds: [machineIds[1]], method: "text", note: "Approved the JCB by text" });
     expect(d.json.stage).toBe("approved");
   });
 
@@ -146,7 +149,7 @@ describe("an order from intake to hand-off", () => {
       const o = await env.DB.prepare("INSERT INTO orders (source, order_number, ordered_at, stage) VALUES ('manual', ?, ?, 'handed_off') RETURNING id")
         .bind(`#H${n}`, new Date().toISOString())
         .first<{ id: number }>();
-      await env.DB.prepare("INSERT INTO machines (order_id, machine, kit, finish, quarter_length_in, handed_off_at) VALUES (?, 'John Deere 325G', 'Full wrap kit', 'CG', 150, ?)")
+      await env.DB.prepare("INSERT INTO machines (order_id, machine, kit, finish, quarter_length_in, handed_off_at) VALUES (?, 'Bobcat T770/S770', 'CUSTOM ONE-OFF / Full (Pictured)', 'MT', 150, ?)")
         .bind(o!.id, new Date().toISOString())
         .run();
     }
@@ -175,6 +178,29 @@ describe("an order from intake to hand-off", () => {
     const q = await alissa.req("GET", "/api/queue");
     expect(q.json.groups.flatMap((g: Json) => g.orders)).toHaveLength(0);
     expect(q.json.stats.handedOffThisMonth).toBe(1);
+  });
+});
+
+describe("Sheetz and ship-only orders", () => {
+  it("sends an application-kit-only order straight to production", async () => {
+    expect((await sendWebhook("orders/create", shipOnlyShopifyOrder())).status).toBe(201);
+    const board = await cierra.req("GET", "/api/assign");
+    expect(board.json.unassigned.map((u: Json) => u.order.orderNumber)).not.toContain("514860003");
+    const row = await env.DB.prepare("SELECT stage FROM orders WHERE order_number = '514860003'").first<{ stage: string }>();
+    expect(row!.stage).toBe("ship_only");
+  });
+
+  it("gives Sheetz their own job that goes through proofs like the kit", async () => {
+    expect((await sendWebhook("orders/create", sheetzShopifyOrder())).status).toBe(201);
+    const board = await cierra.req("GET", "/api/assign");
+    const id = board.json.unassigned.find((u: Json) => u.order.orderNumber === "514860002").order.id;
+    await cierra.req("POST", `/api/orders/${id}/assign`, { personId: alissaId });
+    const d = await alissa.req("GET", `/api/orders/${id}`);
+    expect(d.json.stage).toBe("needs_first_proof");
+    expect(d.json.machines.map((m: Json) => [m.kind, m.machine, m.needsProof, m.approvedAt])).toEqual([
+      ["kit", "Kubota SVL110-3", true, null],
+      ["sheetz", "Sheetz 4x4", true, null],
+    ]);
   });
 });
 

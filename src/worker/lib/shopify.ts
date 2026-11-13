@@ -1,7 +1,17 @@
-// Turns a Shopify order webhook into an order and its machines.
+// Turns a Shopify order webhook into an order, its design jobs and its ship-only items.
 //
-// Hard rule: no price, total or amount is ever copied out of the Shopify payload.
-// Only the payment *status* (paid, pending...) is kept.
+// How Dirty Graphix orders look (checked against real orders, Nov 2026):
+// - Wrap kits are products titled "... Wrap Kits". The variant is the design and coverage
+//   ("CUSTOM ONE-OFF / Full (Pictured)") or, on limited-edition kits, the machine model ("SVL110-3").
+// - The product options app (Globo) adds the customer's choices as line item properties
+//   ("Finish Options", "Year", "Base", "Custom Text", logo uploads) and adds paid options as their own
+//   line items linked to the kit by "_gpo_parent_product_group" (e.g. "Finish", "Application Kit").
+// - Sheetz arrive as option lines ("Sheetz Size" 4x4) with their finish on a separate line ("4x4 Finishes").
+//   They are their own design job and get customer proofs like wrap kits.
+// - Application kits, ADHESOFF, apparel and similar products skip design and just ship.
+//
+// Hard rule: no price, total or amount is ever copied out of the Shopify payload. Option values like
+// "Gravel Guard [$0.31]" have the bracketed price removed. Only the payment *status* is kept.
 
 export const FINISHES = {
   GL: "Gloss",
@@ -45,14 +55,42 @@ export interface IntakeSettings {
   rushTags: string[];
   dealerTags: string[];
   customTags: string[];
+  /** Line item titles that are wrap kits (design with customer proofs). */
+  kitPatterns: string[];
+  /** Line item titles that are Sheetz (their own design job, proofed like wrap kits). */
+  sheetzPatterns: string[];
+  /** Other products that need design with proofs. */
+  otherDesignPatterns: string[];
 }
+
+export const DEFAULT_INTAKE: IntakeSettings = {
+  rushTags: ["rush"],
+  dealerTags: ["dealer", "dealer-b2b"],
+  customTags: ["custom-one-off"],
+  kitPatterns: ["wrap kit"],
+  sheetzPatterns: ["sheetz"],
+  otherDesignPatterns: [],
+};
+
+export type JobKind = "kit" | "sheetz" | "design";
 
 export interface MappedMachine {
   shopifyLineId: string;
+  kind: JobKind;
+  needsProof: boolean;
   machine: string;
   kit: string | null;
   finish: FinishCode | null;
   selections: { name: string; value: string }[];
+}
+
+export interface MappedShipItem {
+  shopifyLineId: string;
+  title: string;
+  variant: string | null;
+  quantity: number;
+  /** The design job this was added to, e.g. an application kit added on a wrap kit. */
+  attachedToLineId: string | null;
 }
 
 export interface MappedOrder {
@@ -73,21 +111,28 @@ export interface MappedOrder {
   isCustom: boolean;
   customReason: string | null;
   machines: MappedMachine[];
+  shipItems: MappedShipItem[];
 }
-
-// Line item property names the customizer may use for these fields.
-const MACHINE_KEYS = ["machine", "equipment", "machine model"];
-const KIT_KEYS = ["kit", "kit type", "coverage"];
-const FINISH_KEYS = ["finish", "laminate"];
 
 type Prop = { name?: string; value?: unknown };
 type Shopify = Record<string, any>;
+
+// Property names that carry a field we pull out on its own.
+const FINISH_KEYS = ["finish", "finish options", "finish option", "laminate"];
+// Properties the designer doesn't need to see.
+const HIDDEN_KEYS = ["model/year check"];
+const BRANDS = [
+  "John Deere", "Bobcat", "CAT", "Caterpillar", "Kubota", "JCB", "Takeuchi", "Case", "New Holland", "Gehl", "Volvo",
+  "ASV", "Yanmar", "Komatsu", "Hitachi", "Kioti", "Mustang", "Wacker Neuson", "Develon", "Doosan", "Toro", "Vermeer",
+];
 
 const clean = (s: unknown): string | null => {
   if (s === null || s === undefined) return null;
   const t = String(s).trim();
   return t ? t : null;
 };
+/** Removes prices the options app puts in values, e.g. "Gravel Guard [$0.31]". */
+export const stripPrices = (s: string) => s.replace(/\s*\[\s*[+-]?\$[^\]]*\]/g, "").trim();
 const splitTags = (tags: unknown): string[] =>
   String(tags ?? "")
     .split(",")
@@ -95,67 +140,60 @@ const splitTags = (tags: unknown): string[] =>
     .filter(Boolean);
 const hasAny = (tags: string[], wanted: string[]) => wanted.some((w) => tags.includes(w.toLowerCase()));
 const isUrl = (v: string) => /^https?:\/\//i.test(v);
+const matches = (text: string, patterns: string[]) => patterns.some((p) => p && text.toLowerCase().includes(p.toLowerCase()));
+const props = (item: Shopify): Prop[] => (Array.isArray(item.properties) ? item.properties : []);
+function prop(item: Shopify, key: string): string | null {
+  const p = props(item).find((x) => String(x.name ?? "").trim().toLowerCase() === key.toLowerCase());
+  return p ? clean(p.value) : null;
+}
+const variantSegments = (item: Shopify): string[] =>
+  String(item.variant_title ?? "")
+    .split("/")
+    .map((s) => s.trim())
+    .filter((s) => s && !/default title$/i.test(s));
+const isRushItem = (item: Shopify) => /\brush\b/i.test(`${item.title ?? ""} ${item.variant_title ?? ""}`);
+const isFinishLine = (item: Shopify) => /\bfinish(es)?\b/i.test(String(item.title ?? "")) && !!parseFinish(item.variant_title);
+const MODEL_CODE = /^[A-Z]{1,5}[\s-]?\d{2,4}[A-Z0-9-]*$/i;
 
-function propValue(props: Prop[], keys: string[]): string | null {
-  for (const p of props) {
-    const n = String(p.name ?? "").trim().toLowerCase();
-    if (keys.includes(n)) return clean(p.value);
-  }
-  return null;
+/** "2025+ Bobcat T770/S770 Wrap Kits" → "Bobcat T770/S770" */
+function cleanKitTitle(title: string): string {
+  return title
+    .replace(/\bwrap\s*kits?\b/gi, "")
+    .replace(/^\s*\d{4}\s*(\+|-\s*\d{4})?\s*/, "")
+    .replace(/\s+-\s*$/, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
-function optionValue(item: Shopify, keys: string[]): string | null {
-  // Variant options arrive as "variant_options" on some payloads and inside "variant_title" on all.
-  const opts: unknown = item.variant_options;
-  if (Array.isArray(opts)) {
-    for (const o of opts as Shopify[]) {
-      if (keys.includes(String(o.name ?? "").toLowerCase())) return clean(o.value);
-    }
+function kitIdentity(item: Shopify, kind: JobKind): { machine: string; kit: string | null } {
+  const title = clean(item.title) ?? "Unknown";
+  const segs = variantSegments(item);
+  if (kind === "sheetz") return { machine: `Sheetz${segs.length ? ` ${segs.join(" / ")}` : ""}`, kit: "Sheetz" };
+  if (kind === "design") return { machine: title, kit: segs.length ? segs.join(" / ") : null };
+  const model = segs.find((s) => MODEL_CODE.test(s));
+  if (model) {
+    // Limited-edition kits: the variant is the machine model and the product is the kit.
+    const brand = BRANDS.find((b) => new RegExp(`\\b${b}\\b`, "i").test(title));
+    const rest = segs.filter((s) => s !== model);
+    return { machine: `${brand ?? ""} ${model}`.trim(), kit: [cleanKitTitle(title), ...rest].filter(Boolean).join(" / ") };
   }
-  return null;
+  return { machine: cleanKitTitle(title) || title, kit: segs.length ? segs.join(" / ") : null };
 }
 
-/** True when a line item is a rush add-on rather than a machine. */
-function isRushItem(item: Shopify): boolean {
-  return /\brush\b/i.test(String(item.title ?? "")) || /\brush\b/i.test(String(item.name ?? ""));
-}
-
-function mapMachine(item: Shopify): MappedMachine | null {
-  const props: Prop[] = Array.isArray(item.properties) ? item.properties : [];
-  const variantTitle = clean(item.variant_title);
-  const finish =
-    parseFinish(propValue(props, FINISH_KEYS)) ??
-    parseFinish(optionValue(item, FINISH_KEYS)) ??
-    parseFinish(variantTitle) ??
-    parseFinish(item.title);
-  const machineFromProps = propValue(props, MACHINE_KEYS);
-  // Only line items that carry a finish or a machine are machines. Hats, decals and add-ons are skipped.
-  if (!finish && !machineFromProps) return null;
-
-  let kit = propValue(props, KIT_KEYS) ?? optionValue(item, KIT_KEYS);
-  if (!kit && variantTitle) {
-    const rest = variantTitle
-      .split("/")
-      .map((s) => s.trim())
-      .filter((s) => s && !parseFinish(s));
-    kit = rest.length ? rest.join(" / ") : null;
+function selectionsFor(item: Shopify): { name: string; value: string }[] {
+  const out: { name: string; value: string }[] = [];
+  for (const p of props(item)) {
+    let name = String(p.name ?? "").trim();
+    const raw = clean(p.value);
+    if (!name || !raw || name.startsWith("_") || isUrl(raw)) continue;
+    const lower = name.toLowerCase();
+    if (FINISH_KEYS.includes(lower) || HIDDEN_KEYS.includes(lower)) continue;
+    const value = stripPrices(raw);
+    if (!value || /add application kit/i.test(value)) continue; // shown as a ship item instead
+    if (/^(radio|buttons|dropdown|checkbox|select)-\d+$/i.test(name)) name = "Option";
+    out.push({ name, value });
   }
-
-  const ignored = new Set([...MACHINE_KEYS, ...KIT_KEYS, ...FINISH_KEYS]);
-  const selections = props
-    .filter((p) => {
-      const n = String(p.name ?? "").trim();
-      return n && !n.startsWith("_") && !ignored.has(n.toLowerCase()) && clean(p.value) && !isUrl(String(p.value));
-    })
-    .map((p) => ({ name: String(p.name).trim(), value: String(p.value).trim() }));
-
-  return {
-    shopifyLineId: String(item.id),
-    machine: machineFromProps ?? clean(item.title) ?? "Unknown machine",
-    kit,
-    finish,
-    selections,
-  };
+  return out;
 }
 
 function formatAddress(a: Shopify | null | undefined): string | null {
@@ -165,24 +203,89 @@ function formatAddress(a: Shopify | null | undefined): string | null {
   return [a.name, a.company, line, city, a.country_code ?? a.country].filter(Boolean).join(" · ") || null;
 }
 
-export function mapShopifyOrder(o: Shopify, settings: IntakeSettings): MappedOrder {
+export function mapShopifyOrder(o: Shopify, settings: IntakeSettings = DEFAULT_INTAKE): MappedOrder {
   const items: Shopify[] = Array.isArray(o.line_items) ? o.line_items : [];
   const orderTags = splitTags(o.tags);
   const customerTags = splitTags(o.customer?.tags);
   const allTags = [...orderTags, ...customerTags];
 
-  const machines = items.map(mapMachine).filter((m): m is MappedMachine => m !== null);
+  const machines: MappedMachine[] = [];
+  const shipItems: MappedShipItem[] = [];
+  const byGroup = new Map<string, MappedMachine>(); // options-app group id → design job
+  const finishLines: Shopify[] = [];
+  const children: Shopify[] = [];
+
+  // Pass 1: design jobs.
+  for (const item of items) {
+    const title = String(item.title ?? "");
+    if (prop(item, "_gpo_parent_product_group")) {
+      children.push(item);
+      continue;
+    }
+    if (isRushItem(item)) continue;
+    const kind: JobKind | null = matches(title, settings.sheetzPatterns)
+      ? "sheetz"
+      : matches(title, settings.kitPatterns)
+        ? "kit"
+        : matches(title, settings.otherDesignPatterns)
+          ? "design"
+          : null;
+    if (!kind) {
+      if (isFinishLine(item)) finishLines.push(item);
+      else shipItems.push({ shopifyLineId: String(item.id), title: clean(title) ?? "Item", variant: clean(variantSegments(item).join(" / ")), quantity: Number(item.quantity ?? 1), attachedToLineId: null });
+      continue;
+    }
+    const finishProp = FINISH_KEYS.map((k) => prop(item, k)).find(Boolean);
+    const id = kitIdentity(item, kind);
+    const machine: MappedMachine = {
+      shopifyLineId: String(item.id),
+      kind,
+      needsProof: true,
+      machine: id.machine,
+      kit: id.kit,
+      finish: parseFinish(finishProp ? stripPrices(finishProp) : null) ?? (kind === "kit" ? parseFinish(item.variant_title) ?? parseFinish(title) : null),
+      selections: selectionsFor(item),
+    };
+    const group = prop(item, "_gpo_product_group");
+    if (group) byGroup.set(group, machine);
+    machines.push(machine);
+  }
+
+  // Pass 2: option lines linked to a design job (Finish, Application Kit, ...).
+  for (const child of children) {
+    const parent = byGroup.get(prop(child, "_gpo_parent_product_group")!);
+    const field = (prop(child, "_gpo_field_name") ?? "").toLowerCase();
+    const finish = parseFinish(child.variant_title);
+    if (finish && (field.includes("finish") || /finish/i.test(String(child.title ?? "")))) {
+      if (parent && !parent.finish) parent.finish = finish;
+      continue;
+    }
+    if (isRushItem(child)) continue;
+    shipItems.push({
+      shopifyLineId: String(child.id),
+      title: clean(child.title) ?? "Item",
+      variant: clean(variantSegments(child).join(" / ")),
+      quantity: Number(child.quantity ?? 1),
+      attachedToLineId: parent?.shopifyLineId ?? null,
+    });
+  }
+
+  // Finish lines that aren't linked (e.g. "4x4 Finishes" for Sheetz) go to the first job still missing one, Sheetz first.
+  for (const line of finishLines) {
+    const target = machines.find((m) => m.kind === "sheetz" && !m.finish) ?? machines.find((m) => !m.finish);
+    if (target) target.finish = parseFinish(line.variant_title);
+  }
 
   const uploads: { name: string; url: string }[] = [];
   for (const item of items) {
-    for (const p of (Array.isArray(item.properties) ? item.properties : []) as Prop[]) {
+    for (const p of props(item)) {
       const v = clean(p.value);
       if (v && isUrl(v)) uploads.push({ name: String(p.name ?? "File").replace(/^_+/, ""), url: v });
     }
   }
 
   const customByTag = hasAny(orderTags, settings.customTags);
-  const customByName = items.some((i) => /custom\s*one[\s-]*off/i.test(String(i.title ?? "")));
+  const customByName = items.some((i) => /custom\s*one[\s-]*off/i.test(`${i.title ?? ""} ${i.variant_title ?? ""}`));
   const customer = o.customer ?? {};
   const ship = o.shipping_address ?? null;
   const first = clean(customer.first_name ?? ship?.first_name);
@@ -190,7 +293,7 @@ export function mapShopifyOrder(o: Shopify, settings: IntakeSettings): MappedOrd
 
   return {
     shopifyOrderId: String(o.id),
-    orderNumber: clean(o.name) ?? `#${o.order_number ?? o.id}`,
+    orderNumber: clean(o.name) ?? String(o.order_number ?? o.id),
     orderedAt: new Date(o.created_at ?? Date.now()).toISOString(),
     customerName: [first, last].filter(Boolean).join(" ") || clean(ship?.name),
     company: clean(ship?.company ?? o.billing_address?.company),
@@ -204,7 +307,8 @@ export function mapShopifyOrder(o: Shopify, settings: IntakeSettings): MappedOrd
     isRush: hasAny(allTags, settings.rushTags) || items.some(isRushItem),
     isDealer: hasAny(allTags, settings.dealerTags),
     isCustom: customByTag || customByName,
-    customReason: customByTag ? "Shopify tag" : customByName ? "Product name says custom one-off" : null,
+    customReason: customByTag ? "Shopify tag" : customByName ? "Ordered as a custom one-off" : null,
     machines,
+    shipItems,
   };
 }
