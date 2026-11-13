@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Production backlog</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#0F1113}
+a{color:#8EC5FF}a:hover{color:#B9DBFF}
+</style>
+</helmet>
+<main style="min-height: 100vh; box-sizing: border-box; background: #0F1113; color: #F2F2F0; font-family: Inter, system-ui, sans-serif; padding: 0 0 40px">
+<header style="background: #16181B; border-bottom: 4px solid #FF8A1F">
+<div style="max-width: 1440px; margin: 0 auto; box-sizing: border-box; padding: 18px 24px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px">
+<div style="display: flex; align-items: baseline; gap: 14px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 16px; letter-spacing: 0.14em; text-transform: uppercase; color: #FF8A1F">Dirty Graphix</span>
+<h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 38px; line-height: 1; letter-spacing: 0.02em; text-transform: uppercase">Production backlog</h1>
+</div>
+<span style="font-size: 13px; color: #A6ADB5; border: 1px solid #3A4048; border-radius: 6px; padding: 3px 8px">Sample data · tap a finish to see every job</span>
+</div>
+</header>
+<div style="max-width: 1440px; margin: 0 auto; box-sizing: border-box; padding: 22px 24px 0; display: flex; flex-direction: column; gap: 22px">
+
+<section aria-label="Backlog summary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px">
+<sc-for list="{{stats}}" as="s" hint-placeholder-count="4">
+<div style="background: #181B1F; border: 1px solid #2A2F35; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 14px; color: #A6ADB5">{{s.label}}</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 40px; line-height: 1.05; font-variant-numeric: tabular-nums">{{s.value}}</span>
+<span style="font-size: 13px; color: #A6ADB5">{{s.note}}</span>
+</div>
+</sc-for>
+</section>
+
+<section aria-label="Backlog by finish" style="background: #181B1F; border: 1px solid #2A2F35; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 12px; padding-bottom: 8px">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px; letter-spacing: 0.04em; text-transform: uppercase">By finish · in rolls</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: #C9CED4">
+<span style="display: inline-flex; align-items: center; gap: 6px"><span aria-hidden="true" style="width: 14px; height: 14px; border-radius: 3px; background: #C9CED4"></span>In production queue</span>
+<span style="display: inline-flex; align-items: center; gap: 6px"><span aria-hidden="true" style="width: 14px; height: 14px; border-radius: 3px; background: repeating-linear-gradient(135deg, #5A616B 0 3px, #2A2F35 3px 6px)"></span>Coming from design</span>
+<span style="display: inline-flex; align-items: center; gap: 6px"><span aria-hidden="true" style="width: 2px; height: 14px; background: #F2F2F0"></span>Roll break (1,704 in · 864 for GG and prismatic)</span>
+</div>
+</div>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="7">
+<button type="button" onClick="{{r.pick}}" aria-pressed="{{r.pressed}}" style="{{r.rowStyle}}">
+<span style="display: flex; align-items: center; gap: 10px; min-width: 0">
+<span style="{{r.badgeStyle}}">{{r.code}}</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; text-transform: uppercase; white-space: nowrap">{{r.name}}</span>
+</span>
+<span role="img" aria-label="{{r.barLabel}}" style="position: relative; display: flex; height: 26px; border-radius: 6px; overflow: hidden; background: #101215; border: 1px solid #2A2F35">
+<span style="{{r.queuedStyle}}"></span>
+<span style="{{r.comingStyle}}"></span>
+<span style="{{r.break1}}"></span>
+<span style="{{r.break2}}"></span>
+<span style="{{r.break3}}"></span>
+</span>
+<span style="font-size: 15px; color: #E4E7EA; font-variant-numeric: tabular-nums; text-align: right">{{r.summary}}</span>
+<span style="font-size: 13px; color: #A6ADB5; text-align: right">{{r.next}}</span>
+</button>
+</sc-for>
+</section>
+
+<section aria-label="Every job in the selected finish" style="background: #181B1F; border: 1px solid #2A2F35; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 12px">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 30px; text-transform: uppercase">{{detailTitle}}</h2>
+<span style="font-size: 14px; color: #A6ADB5">{{detailNote}}</span>
+</div>
+<sc-if value="{{hasJobs}}" hint-placeholder-val="{{true}}">
+<div style="overflow-x: auto">
+<div style="min-width: 860px; font-size: 15px">
+<div style="display: grid; grid-template-columns: 170px 90px minmax(0, 1fr) 100px 100px minmax(0, 1.4fr); gap: 12px; padding: 8px 0; border-bottom: 2px solid #2A2F35; color: #A6ADB5; font-weight: 600">
+<span>Planned roll</span><span>Order</span><span>Machine</span><span style="text-align: right">Length</span><span style="text-align: right">Waiting</span><span>Notes</span>
+</div>
+<sc-for list="{{jobs}}" as="j" hint-placeholder-count="6">
+<div style="{{j.rowStyle}}">
+<span><span style="{{j.rollStyle}}">{{j.roll}}</span></span>
+<span style="font-weight: 700; font-variant-numeric: tabular-nums">{{j.order}}</span>
+<span style="color: #E4E7EA">{{j.machine}}</span>
+<span style="text-align: right; font-weight: 600; font-variant-numeric: tabular-nums">{{j.len}}</span>
+<span style="text-align: right; color: #A6ADB5; font-variant-numeric: tabular-nums">{{j.age}}</span>
+<span><span style="{{j.tagStyle}}">{{j.tag}}</span> <span style="color: #A6ADB5">{{j.note}}</span></span>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{noJobs}}" hint-placeholder-val="{{false}}">
+<p style="margin: 0; color: #A6ADB5; font-size: 16px">Nothing queued or coming in this finish.</p>
+</sc-if>
+</section>
+
+</div>
+</main>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1320}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var self = this;
+    var st = this.state || {};
+    var sel = st.sel || "GG";
+    var color = { GL: "#34C759", MT: "#3B82F6", GG: "#B57BFF", CG: "#E6FF2E", PR: "#FF3DA0", CM: "#14B8A6", CP: "#9AA3AE" };
+    var Q = function (roll, order, machine, len, age, tag, note) { return { roll: roll, order: order, machine: machine, len: len, age: age, tag: tag || "", note: note || "", coming: false }; };
+    var C = function (order, machine, len, due, tag, note) { return { roll: "From design", order: order, machine: machine, len: len, age: due, tag: tag || "", note: note || "", coming: true }; };
+    var data = [
+      { code: "GL", name: "Gloss", next: "Roll 1 ready · 98%", jobs: [
+        Q("Roll 1 · next", "#4798", "Kubota SVL75-3", 620, "4d"),
+        Q("Roll 1 · next", "#4811", "Bobcat S650", 310, "2d", "", "gap fill"),
+        Q("Roll 1 · next", "#4802", "CAT 262D3", 540, "4d"),
+        Q("Roll 1 · next", "#4815", "John Deere 333G", 180, "1d", "", "gap fill"),
+        Q("Roll 2 · forming", "#4824", "CAT 299D3", 460, "0d", "DEALER"),
+        Q("Roll 2 · forming", "#4823", "Bobcat T76", 520, "1d"),
+        C("#4820", "CAT 259D3", 540, "due Tue", "", "ships with #4820 Chrome Gloss"),
+        C("#4831", "Bobcat T66", 400, "due Wed")
+      ] },
+      { code: "GG", name: "Gravel Guard", next: "Roll 1 ready · 99% (best combo)", jobs: [
+        Q("Roll 1 · next", "#4807", "Bobcat T770", 412, "5d", "", "oldest · anchors the roll"),
+        Q("Roll 1 · next", "#4817", "Kubota SVL65-2", 300, "3d", "", "picked to fill"),
+        Q("Roll 1 · next", "#4825", "Bobcat S70", 140, "1d", "", "picked to fill"),
+        Q("Roll 2 · forming", "#4813", "CAT 289D3", 380, "4d", "", "next in line by date, but didn't fit"),
+        C("#4826", "CAT 299D3", 430, "due today", "RUSH")
+      ] },
+      { code: "CG", name: "Chrome Gloss", next: "Roll 1 ready · 96%", jobs: [
+        Q("Roll 1 · next", "#4812", "Bobcat E35", 318, "2d"),
+        Q("Roll 1 · next", "#4816", "Kubota KX040-4", 294, "1d"),
+        C("#4820", "John Deere 325G", 620, "due Tue", "", "ships with #4820 Gloss")
+      ] },
+      { code: "MT", name: "Matte", next: "Holding · forces Wed, Nov 11", jobs: [
+        Q("Roll 1 · holding", "#4790", "CAT 308 CR", 744, "4d"),
+        Q("Roll 1 · holding", "#4809", "Takeuchi TL10V2", 292, "2d"),
+        C("#4818", "Kubota SVL97-2", 560, "in revision")
+      ] },
+      { code: "PR", name: "Prismatic", next: "Holding · forces Fri, Nov 13", jobs: [
+        Q("Roll 1 · holding", "#4819", "CAT 259D3", 642, "6d")
+      ] },
+      { code: "CM", name: "Chrome Matte", next: "Nothing queued", jobs: [
+        C("#4822", "Bobcat T770", 520, "on hold", "", "waiting on billing")
+      ] },
+      { code: "CP", name: "Chrome Prismatic", next: "Nothing queued", jobs: [] }
+    ];
+
+    var n = function (x) { return x.toLocaleString("en-US"); };
+    var tagBase = "font-size:12px;font-weight:700;letter-spacing:.06em;padding:3px 8px;border-radius:6px;white-space:nowrap;";
+    var tagStyles = { RUSH: tagBase + "background:#FF8A1F;color:#141414;", DEALER: tagBase + "background:#F2F2F0;color:#141414;", "": "" };
+    var totQ = 0, totC = 0, jobsQ = 0, jobsC = 0;
+
+    var SHORT = { GG: 1, PR: 1, CP: 1 };
+    var rollsQ = 0;
+    var rows = data.map(function (f) {
+      var ROLL = SHORT[f.code] ? 864 : 1704, SCALE = 3 * ROLL;
+      var q = 0, c = 0;
+      f.jobs.forEach(function (j) { if (j.coming) { c += j.len + 3; jobsC++; } else { q += j.len + 3; jobsQ++; } });
+      totQ += q; totC += c; rollsQ += q / ROLL;
+      var qp = Math.min(q / SCALE * 100, 100), cp = Math.min(c / SCALE * 100, 100 - qp);
+      var on = f.code === sel;
+      var brk = function (k) { return "position:absolute;top:0;bottom:0;width:2px;background:#F2F2F0;opacity:.7;left:" + (k * ROLL / SCALE * 100).toFixed(2) + "%;"; };
+      return {
+        code: f.code, name: f.name, next: f.next, pressed: on ? "true" : "false",
+        pick: function () { self.setState({ sel: f.code }); },
+        rowStyle: "display:grid;grid-template-columns:230px minmax(0,1fr) 210px 230px;gap:16px;align-items:center;padding:10px 12px;border-radius:10px;cursor:pointer;text-align:left;color:#F2F2F0;font-family:Inter,sans-serif;" + (on ? "background:#22262B;border:2px solid " + color[f.code] + ";" : "background:transparent;border:2px solid transparent;"),
+        badgeStyle: "font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;letter-spacing:.06em;padding:2px 8px;border-radius:5px;color:#141414;background:" + color[f.code] + ";",
+        queuedStyle: "flex:0 0 " + qp.toFixed(2) + "%;background:" + color[f.code] + ";",
+        comingStyle: "flex:0 0 " + cp.toFixed(2) + "%;background:repeating-linear-gradient(135deg," + color[f.code] + " 0 3px,#2A2F35 3px 7px);opacity:.75;",
+        break1: brk(1), break2: brk(2), break3: "display:none;",
+        barLabel: f.name + ": " + n(q) + " inches queued, " + n(c) + " inches coming from design",
+        summary: q || c ? (q / ROLL).toFixed(1) + " rolls · +" + (c / ROLL).toFixed(1) + " coming" : "Empty"
+      };
+    });
+
+    var f = data.filter(function (d) { return d.code === sel; })[0];
+    var jobs = f.jobs.map(function (j) {
+      var rollColor = j.coming ? "#A6ADB5" : (j.roll.indexOf("Roll 1") === 0 ? color[f.code] : "#5A616B");
+      return {
+        roll: j.roll, order: j.order, machine: j.machine, len: n(j.len) + " in", age: j.age,
+        tag: j.tag, tagStyle: tagStyles[j.tag] || "", note: j.note,
+        rowStyle: "display:grid;grid-template-columns:170px 90px minmax(0,1fr) 100px 100px minmax(0,1.4fr);gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid #23272C;" + (j.coming ? "opacity:.8;" : ""),
+        rollStyle: "display:inline-block;font-size:13px;font-weight:700;padding:3px 9px;border-radius:6px;white-space:nowrap;" + (j.coming ? "border:1px dashed #5A616B;color:#C9CED4;" : "border:1px solid " + rollColor + ";color:#F2F2F0;")
+      };
+    });
+    var fq = f.jobs.filter(function (j) { return !j.coming; }).length;
+    var fc = f.jobs.length - fq;
+
+    var stats = [
+      { label: "Jobs in production queue", value: String(jobsQ), note: "Across all finishes" },
+      { label: "Inches queued", value: n(totQ), note: "≈ " + rollsQ.toFixed(1) + " rolls of laminate" },
+      { label: "Coming from design", value: String(jobsC), note: n(totC) + " in · approved or in progress" },
+      { label: "Oldest job waiting", value: "6 days", note: "Prismatic · forces Fri, Nov 13" }
+    ];
+
+    return {
+      stats: stats, rows: rows, jobs: jobs, hasJobs: jobs.length > 0, noJobs: jobs.length === 0,
+      detailTitle: f.name + " · every job",
+      detailNote: fq + " queued · " + fc + " coming from design · " + f.next
+    };
+  }
+}
+</script>
+</body>
+</html>

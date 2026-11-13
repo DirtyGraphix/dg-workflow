@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Billing queue</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#F4F5F7}
+a{color:#1F6FD1}a:hover{color:#1556A6}
+</style>
+</helmet>
+<main style="min-height: 100vh; box-sizing: border-box; background: #F4F5F7; color: #16181B; font-family: Inter, system-ui, sans-serif; padding: 0 0 40px">
+<header style="background: #16181B; color: #F2F2F0; border-bottom: 4px solid #FF8A1F">
+<div style="max-width: 1440px; margin: 0 auto; box-sizing: border-box; padding: 18px 24px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px">
+<div style="display: flex; align-items: baseline; gap: 14px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 16px; letter-spacing: 0.14em; text-transform: uppercase; color: #FF8A1F">Dirty Graphix</span>
+<h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 38px; line-height: 1; letter-spacing: 0.02em; text-transform: uppercase">Billing changes</h1>
+</div>
+<span style="font-size: 14px; color: #A6ADB5">Signed in as <strong style="color: #F2F2F0">Nikki</strong> · Mon, Nov 9 · sample data</span>
+</div>
+</header>
+<div style="max-width: 1440px; margin: 0 auto; box-sizing: border-box; padding: 20px 24px 0; display: flex; flex-direction: column; gap: 20px">
+
+<section aria-label="Billing summary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px">
+<sc-for list="{{stats}}" as="s" hint-placeholder-count="4">
+<div style="{{s.boxStyle}}">
+<span style="font-size: 13px; color: #5A626C">{{s.label}}</span>
+<span style="{{s.style}}">{{s.value}}</span>
+<span style="font-size: 13px; color: #5A626C">{{s.note}}</span>
+</div>
+</sc-for>
+</section>
+
+<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+
+<nav aria-label="Billing requests" style="flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: 18px">
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="3">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<h2 style="margin: 0; display: flex; align-items: center; gap: 8px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 18px; letter-spacing: 0.06em; text-transform: uppercase; color: #16181B"><span aria-hidden="true" style="{{g.dotStyle}}"></span>{{g.title}} <span style="{{g.countStyle}}">{{g.count}}</span></h2>
+<sc-for list="{{g.items}}" as="it" hint-placeholder-count="2">
+<a href="#request" style="{{it.cardStyle}}">
+<span style="display: flex; justify-content: space-between; gap: 8px">
+<span style="font-weight: 700; font-size: 16px">{{it.order}}</span>
+<span style="font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums">{{it.amount}}</span>
+</span>
+<span style="font-size: 15px">{{it.what}}</span>
+<span style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px">
+<sc-for list="{{it.chips}}" as="c" hint-placeholder-count="1">
+<span style="{{c.style}}">{{c.text}}</span>
+</sc-for>
+</span>
+<span style="{{it.metaStyle}}">{{it.meta}}</span>
+</a>
+</sc-for>
+</div>
+</sc-for>
+</nav>
+
+<section id="request" aria-label="Billing request for order 4822" style="flex: 999 1 560px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE1E6; border-top: 6px solid #E07B00; border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 22px">
+
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; align-items: flex-start">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 14px; color: #5A626C">Sent by Alissa (design) · Mon 10:15 AM</span>
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 38px; line-height: 1; text-transform: uppercase">#4822 · Finish change</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px">
+<span style="{{statusStyle}}">{{statusText}}</span>
+<span style="font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: #F0F2F5; color: #3A4047; border: 1px solid #DDE1E6">Design clock paused</span>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px">
+<span style="font-size: 12px; color: #5A626C">Already paid</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 32px; line-height: 1; font-variant-numeric: tabular-nums">$945</span>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 20px">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<h3 style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #5A626C">Customer</h3>
+<dl style="margin: 0; display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 8px 12px; font-size: 15px">
+<dt style="color: #5A626C">Name</dt><dd style="margin: 0">[Customer name]</dd>
+<dt style="color: #5A626C">Email</dt><dd style="margin: 0">[Customer email]</dd>
+<dt style="color: #5A626C">Phone</dt><dd style="margin: 0">[Customer phone]</dd>
+<dt style="color: #5A626C">Order</dt><dd style="margin: 0">#4822 · placed Thu, Nov 5</dd>
+</dl>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px; background: #FFF8EF; border: 1px solid #F5D9B5; border-radius: 12px; padding: 14px 16px">
+<h3 style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #A84C05">Note from design</h3>
+<p style="margin: 0; font-size: 16px; line-height: 1.5">“Customer called and wants Chrome Matte instead of Matte on the T770. Everything else stays the same. They know there’s an upcharge.”</p>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px">
+<h3 style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #5A626C">What changed</h3>
+<table style="width: 100%; border-collapse: collapse; font-size: 15px">
+<thead>
+<tr style="text-align: left; color: #5A626C; border-bottom: 2px solid #DDE1E6">
+<th scope="col" style="padding: 8px 8px 8px 0; font-weight: 600">Machine</th>
+<th scope="col" style="padding: 8px; font-weight: 600">Was</th>
+<th scope="col" style="padding: 8px; font-weight: 600">Now</th>
+<th scope="col" style="padding: 8px 0 8px 8px; font-weight: 600; text-align: right">Price difference</th>
+</tr>
+</thead>
+<tbody>
+<tr style="border-bottom: 1px solid #EEF0F3">
+<th scope="row" style="padding: 12px 8px 12px 0; text-align: left; font-weight: 600">Bobcat T770 · Full wrap kit</th>
+<td style="padding: 12px 8px"><span style="{{wasChip.style}}">{{wasChip.text}}</span></td>
+<td style="padding: 12px 8px"><span style="{{nowChip.style}}">{{nowChip.text}}</span></td>
+<td style="padding: 12px 0 12px 8px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums">+$210</td>
+</tr>
+</tbody>
+</table>
+<span style="font-size: 13px; color: #5A626C">Price difference suggested from current Shopify prices. Check it before invoicing.</span>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding-top: 6px; border-top: 1px solid #EEF0F3">
+<a href="#request" style="display: inline-flex; align-items: center; min-height: 48px; padding: 0 18px; border-radius: 10px; border: 1px solid #C5CBD3; background: #FFFFFF; color: #16181B; font-weight: 600; font-size: 15px; text-decoration: none">Open order in Shopify</a>
+<button type="button" onClick="{{markSent}}" style="{{sentBtnStyle}}">{{sentBtnText}}</button>
+<button type="button" onClick="{{markPaid}}" style="{{paidBtnStyle}}">{{paidBtnText}}</button>
+<button type="button" style="min-height: 48px; padding: 0 16px; border-radius: 10px; border: none; background: transparent; color: #1F6FD1; font-weight: 600; font-size: 15px; cursor: pointer">Ask design a question</button>
+</div>
+<span style="font-size: 13px; color: #3A4047">{{footNote}}</span>
+
+</section>
+</div>
+</div>
+</main>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var self = this;
+    var st = this.state || {};
+    var stage = st.stage || "new";
+    var FIN = { GL: ["Gloss", "#34C759"], MT: ["Matte", "#3B82F6"], GG: ["Gravel Guard", "#B57BFF"], CG: ["Chrome Gloss", "#E6FF2E"],
+      PR: ["Prismatic", "#FF3DA0"], CM: ["Chrome Matte", "#14B8A6"], CP: ["Chrome Prismatic", "#9AA3AE"] };
+    var chip = function (code) { return { text: code + " · " + FIN[code][0], style: "display:inline-block;font-size:12px;font-weight:700;letter-spacing:.04em;padding:3px 8px;border-radius:6px;color:#141414;white-space:nowrap;background:" + FIN[code][1] + ";" }; };
+    var arrow = { text: "→", style: "font-size:14px;font-weight:700;color:#5A626C;" };
+    var plus = { text: "+", style: "font-size:14px;font-weight:700;color:#5A626C;" };
+    var cardBase = "display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:12px;text-decoration:none;color:#16181B;";
+    var card = "background:#FFFFFF;border:1px solid #DDE1E6;";
+    var cardSel = "background:#FFFFFF;border:2px solid #16181B;box-shadow:0 2px 8px rgba(22,24,27,.12);";
+    var meta = "font-size:13px;color:#5A626C;";
+    var metaWarn = "font-size:13px;font-weight:600;color:#A84C05;";
+    var mk = function (o, amount, what, chips, m, warn, sel) {
+      return { order: "#" + o, amount: amount, what: what, chips: chips, meta: m, metaStyle: warn ? metaWarn : meta, sel: sel };
+    };
+    var groups = [
+      { title: "To invoice", c: "#E07B00", items: [
+        mk(4822, "+$210", "Finish change · Bobcat T770", [chip("MT"), arrow, chip("CM")], "From Alissa · today 10:15 AM", false, true),
+        mk(4817, "+$640", "Added a machine · Kubota SVL75-3", [plus, chip("GL")], "From Alissa · Fri 3:40 PM · waiting 1 business day", true, false)
+      ] },
+      { title: "Invoiced · waiting on payment", c: "#1F6FD1", items: [
+        mk(4809, "+$95", "Upgrade · door panels", [chip("GL"), arrow, chip("GG")], "Invoiced Thu · 4 days unpaid", true, false)
+      ] },
+      { title: "Paid today", c: "#17803D", items: [
+        mk(4799, "+$180", "Finish change · CAT 279D3", [chip("GL"), arrow, chip("PR")], "Paid 9:02 AM · released to Andrew", false, false)
+      ] }
+    ].map(function (g) {
+      return { title: g.title, count: String(g.items.length),
+        dotStyle: "display:inline-block;width:12px;height:12px;border-radius:3px;background:" + g.c + ";",
+        countStyle: "margin-left:auto;font-family:Inter,sans-serif;font-size:13px;font-weight:700;padding:2px 9px;border-radius:999px;color:#FFFFFF;background:" + g.c + ";",
+        items: g.items.map(function (it) { it.cardStyle = cardBase + (it.sel ? cardSel : card) + "border-left:6px solid " + g.c + ";"; return it; }) };
+    });
+
+    var big = "font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:34px;line-height:1.1;font-variant-numeric:tabular-nums;";
+    var box = "background:#FFFFFF;border:1px solid #DDE1E6;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:2px;border-top:5px solid ";
+    var stats = [
+      { label: "To invoice", value: "2", note: "Oldest: 1 business day", style: big + "color:#16181B;", c: "#E07B00" },
+      { label: "Waiting on payment", value: "1", note: "$95 outstanding", style: big + "color:#16181B;", c: "#1F6FD1" },
+      { label: "Paid today", value: "$180", note: "1 order released to design", style: big + "color:#17643A;", c: "#17803D" },
+      { label: "Avg time to paid", value: "1.6 days", note: "Last 30 days", style: big + "color:#16181B;", c: "#16181B" }
+    ].map(function (s) { s.boxStyle = box + s.c + ";"; return s; });
+
+    var pill = "font-size:13px;font-weight:600;padding:4px 10px;border-radius:999px;";
+    var statusText = { "new": "To invoice", sent: "Invoice sent · waiting on payment", paid: "Paid · released to design" }[stage];
+    var statusStyle = pill + ({ "new": "background:#FFF1E3;color:#A84C05;border:1px solid #F5C08C;", sent: "background:#EEF5FE;color:#1556A6;border:1px solid #B9D3F3;", paid: "background:#E8F7EE;color:#17643A;border:1px solid #B9E3C8;" }[stage]);
+    var btnBase = "min-height:48px;padding:0 18px;border-radius:10px;font-weight:600;font-size:15px;cursor:pointer;";
+    var primary = btnBase + "border:none;background:#1F6FD1;color:#FFFFFF;";
+    var green = btnBase + "border:none;background:#17643A;color:#FFFFFF;";
+    var quiet = btnBase + "border:1px solid #C5CBD3;background:#FFFFFF;color:#5A626C;";
+
+    return {
+      groups: groups, stats: stats, statusText: statusText, statusStyle: statusStyle,
+      wasChip: chip("MT"), nowChip: chip("CM"),
+      sentBtnText: stage === "new" ? "Mark invoice sent" : "Invoice sent ✓",
+      sentBtnStyle: stage === "new" ? primary : quiet,
+      paidBtnText: stage === "paid" ? "Released to design ✓" : "Paid, good to go",
+      paidBtnStyle: stage === "sent" ? green : quiet,
+      markSent: function () { self.setState({ stage: "sent" }); },
+      markPaid: function () { if (stage === "sent") { self.setState({ stage: "paid" }); } },
+      footNote: stage === "paid"
+        ? "Alissa has been notified. The design clock is running again, and the new finish is on the order."
+        : "When Shopify shows the invoice paid, this releases to design automatically. Use Paid, good to go if it was paid another way."
+    };
+  }
+}
+</script>
+</body>
+</html>

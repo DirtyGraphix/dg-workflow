@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Thermal labels</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0;background:#D9DCE0}
+a{color:#1F6FD1}a:hover{color:#1556A6}
+</style>
+</helmet>
+<div style="width: 1560px; height: 1320px; box-sizing: border-box; background: #D9DCE0; padding: 48px; font-family: Inter, system-ui, sans-serif; color: #000000; display: flex; gap: 56px; align-items: flex-start">
+
+<div style="display: flex; flex-direction: column; gap: 40px">
+
+<figure style="margin: 0; display: flex; flex-direction: column; gap: 12px">
+<figcaption style="font-size: 18px; font-weight: 600; color: #2A2E33">Roll label · 3 x 2 in · material printer · shown at 2x</figcaption>
+<div style="width: 576px; height: 384px; box-sizing: border-box; background: #FFFFFF; border-radius: 14px; padding: 26px 28px; display: flex; gap: 24px; box-shadow: 0 1px 0 #B7BCC2">
+<div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 84px; line-height: 0.9; letter-spacing: 0.01em">GL-R0143</span>
+<span style="align-self: flex-start; background: #000000; color: #FFFFFF; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 38px; line-height: 1; letter-spacing: 0.08em; padding: 6px 12px">GLOSS LAMINATE</span>
+<span style="font-size: 30px; font-weight: 800">1,704 in · full roll</span>
+<span style="font-size: 20px; font-weight: 500">Received Fri, Nov 6</span>
+<span style="font-size: 20px; font-weight: 500">PO 2291 · Alex</span>
+</div>
+<div style="display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px">
+<div aria-hidden="true" style="display: grid; grid-template-columns: repeat(21, 8px); grid-auto-rows: 8px">
+<sc-for list="{{qrA}}" as="c" hint-placeholder-count="441"><div style="{{c.s}}"></div></sc-for>
+</div>
+<span style="font-size: 16px; font-weight: 600">Scan to load</span>
+</div>
+</div>
+</figure>
+
+<figure style="margin: 0; display: flex; flex-direction: column; gap: 12px">
+<figcaption style="font-size: 18px; font-weight: 600; color: #2A2E33">Remnant label · 3 x 2 in · prints when a batch starts</figcaption>
+<div style="width: 576px; height: 384px; box-sizing: border-box; background: #FFFFFF; border-radius: 14px; padding: 26px 28px; display: flex; gap: 24px; box-shadow: 0 1px 0 #B7BCC2">
+<div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: baseline; gap: 14px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 84px; line-height: 0.9">WH-015</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px; border: 3px solid #000000; padding: 2px 8px; letter-spacing: 0.08em">REMNANT</span>
+</div>
+<span style="align-self: flex-start; background: #000000; color: #FFFFFF; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 38px; line-height: 1; letter-spacing: 0.08em; padding: 6px 12px">WHITE PRINT</span>
+<span style="font-size: 30px; font-weight: 800">1,020 in left</span>
+<span style="font-size: 20px; font-weight: 500">From WH-R0144 · Batch B-1107</span>
+<span style="font-size: 20px; font-weight: 500">Thu, Nov 5</span>
+</div>
+<div style="display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px">
+<div aria-hidden="true" style="display: grid; grid-template-columns: repeat(21, 8px); grid-auto-rows: 8px">
+<sc-for list="{{qrB}}" as="c" hint-placeholder-count="441"><div style="{{c.s}}"></div></sc-for>
+</div>
+<span style="font-size: 16px; font-weight: 600">Scan to load</span>
+</div>
+</div>
+</figure>
+
+<div style="width: 576px; display: flex; flex-direction: column; gap: 8px; font-size: 16px; line-height: 1.45; color: #2A2E33">
+<span style="font-weight: 700">Thermal prints black only</span>
+<span>The finish name prints large and reversed (white on black) so it reads like the colored folders. The roll number is the biggest thing on the label so it reads from a rack.</span>
+</div>
+
+</div>
+
+<figure style="margin: 0; display: flex; flex-direction: column; gap: 12px">
+<figcaption style="font-size: 18px; font-weight: 600; color: #2A2E33">Production job ticket · 4 x 6 in · prints when its batch starts · shown at 2x</figcaption>
+<div style="width: 768px; height: 1152px; box-sizing: border-box; background: #FFFFFF; border-radius: 14px; padding: 36px 40px; display: flex; flex-direction: column; gap: 22px; box-shadow: 0 1px 0 #B7BCC2">
+
+<div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 4px solid #000000; padding-bottom: 14px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 30px; letter-spacing: 0.14em">DIRTY GRAPHIX</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 30px; letter-spacing: 0.1em">PRODUCTION</span>
+</div>
+
+<div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 20px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 132px; line-height: 0.85">#4798</span>
+<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 44px; line-height: 1">1 OF 4</span>
+<span style="font-size: 20px; font-weight: 600">in batch B-1108</span>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="background: #000000; color: #FFFFFF; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 64px; line-height: 1; letter-spacing: 0.08em; padding: 10px 18px; text-align: center">GLOSS</span>
+<span style="text-align: center; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 32px; letter-spacing: 0.06em">WHITE PRINT + GLOSS LAMINATE</span>
+</div>
+
+<div style="display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 12px 18px; font-size: 26px; align-items: baseline">
+<span style="font-weight: 500">Machine</span><span style="font-weight: 800">Kubota SVL75-3</span>
+<span style="font-weight: 500">Kit</span><span style="font-weight: 800">Full wrap kit</span>
+<span style="font-weight: 500">Print length</span><span style="font-weight: 800">620 in</span>
+<span style="font-weight: 500">Rolls</span><span style="font-weight: 800">WH-R0145 + GL-R0141 · position 1</span>
+<span style="font-weight: 500">Customer</span><span style="font-weight: 800">[Customer name]</span>
+<span style="font-weight: 500">Ships</span><span style="font-weight: 800">[Ship method] · [State]</span>
+</div>
+
+<div style="display: flex; gap: 12px">
+<span style="flex: 1 1 0; text-align: center; border: 3px solid #000000; padding: 8px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 28px; letter-spacing: 0.08em">STANDARD</span>
+<span style="flex: 1 1 0; text-align: center; border: 3px dashed #9AA0A6; color: #9AA0A6; padding: 8px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 28px; letter-spacing: 0.08em">RUSH</span>
+<span style="flex: 1 1 0; text-align: center; border: 3px dashed #9AA0A6; color: #9AA0A6; padding: 8px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 28px; letter-spacing: 0.08em">REPRINT</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px; font-size: 20px; font-weight: 500; border-top: 2px solid #000000; padding-top: 14px">
+<span>Approved Thu, Nov 5 · 7:44 AM · Design: Alissa · checklist signed 8:21 AM</span>
+<span style="font-weight: 800">Note from design: Customer added a second door logo. Print panel 4 twice.</span>
+</div>
+
+<div style="margin-top: auto; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div aria-hidden="true" style="display: flex; align-items: stretch; height: 120px">
+<sc-for list="{{bars}}" as="b" hint-placeholder-count="60"><div style="{{b.s}}"></div></sc-for>
+</div>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 24px; letter-spacing: 0.2em">DG-4798-1</span>
+</div>
+<div aria-hidden="true" style="display: grid; grid-template-columns: repeat(21, 9px); grid-auto-rows: 9px">
+<sc-for list="{{qrC}}" as="c" hint-placeholder-count="441"><div style="{{c.s}}"></div></sc-for>
+</div>
+</div>
+
+</div>
+</figure>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1560,"height":1320}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var qr = function (seed) {
+      var cells = [];
+      var finder = function (x, y, ox, oy) {
+        var dx = x - ox, dy = y - oy;
+        if (dx < 0 || dy < 0 || dx > 6 || dy > 6) { return null; }
+        if (dx === 0 || dy === 0 || dx === 6 || dy === 6) { return true; }
+        if (dx >= 2 && dx <= 4 && dy >= 2 && dy <= 4) { return true; }
+        return false;
+      };
+      for (var y = 0; y < 21; y++) {
+        for (var x = 0; x < 21; x++) {
+          var v = finder(x, y, 0, 0);
+          if (v === null) { v = finder(x, y, 14, 0); }
+          if (v === null) { v = finder(x, y, 0, 14); }
+          if (v === null) {
+            var nearFinder = (x < 8 && y < 8) || (x > 12 && y < 8) || (x < 8 && y > 12);
+            if (nearFinder) { v = false; }
+            else if (y === 6) { v = x % 2 === 0; }
+            else if (x === 6) { v = y % 2 === 0; }
+            else { v = ((x * 37 + y * 53 + seed * 11 + x * y * 7) % 7) < 3; }
+          }
+          cells.push({ s: "background:" + (v ? "#000000" : "#FFFFFF") + ";" });
+        }
+      }
+      return cells;
+    };
+    var bars = [];
+    var pattern = [2, 1, 3, 1, 1, 2, 4, 1, 2, 2, 1, 3, 1, 1, 3, 2, 1, 2, 2, 1, 4, 1, 1, 3, 2, 1, 1, 2, 3, 1, 2, 1, 1, 4, 2, 1, 3, 1, 2, 2, 1, 1, 3, 2, 1, 2, 4, 1, 1, 2, 3, 1, 2, 1, 1, 3, 2, 2, 1, 2];
+    for (var i = 0; i < pattern.length; i++) {
+      bars.push({ s: "flex:0 0 " + (pattern[i] * 3) + "px;background:" + (i % 2 === 0 ? "#000000" : "#FFFFFF") + ";" });
+    }
+    return { qrA: qr(3), qrB: qr(9), qrC: qr(5), bars: bars };
+  }
+}
+</script>
+</body>
+</html>
