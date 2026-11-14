@@ -603,3 +603,31 @@ describe("the Resend connection", () => {
     }
   });
 });
+
+describe("fixing the customer's email", () => {
+  it("lets the order's designer correct it, logs the change and emails the waiting proof to the new address", async () => {
+    await sendWebhook("orders/create", sampleShopifyOrder({ id: 5550030, name: "514860030", email: "rick@exmaple.com" }));
+    const id = (await cierra.req("GET", "/api/assign")).json.unassigned.find((u: Json) => u.order.orderNumber === "514860030").order.id;
+    await cierra.req("POST", `/api/orders/${id}/assign`, { personId: alissaId });
+    const ms = (await alissa.req("GET", `/api/orders/${id}`)).json.machines.map((m: Json) => m.id);
+    await sendProofAs(alissa, id, ms, "");
+    expect((await andrew.req("PATCH", `/api/orders/${id}/contact`, { email: "rick@example.com" })).status).toBe(403);
+    expect((await alissa.req("PATCH", `/api/orders/${id}/contact`, { email: "rick@" })).status).toBe(400);
+    const r = await alissa.req("PATCH", `/api/orders/${id}/contact`, { email: "rick@example.com", resendProof: true });
+    expect(r.status).toBe(200);
+    expect(r.json.resent).toBe(true);
+    expect(r.json.order.customer.email).toBe("rick@example.com");
+    const kinds = r.json.order.timeline.map((e: Json) => e.kind);
+    expect(kinds).toEqual(expect.arrayContaining(["contact_changed", "proof_resent"]));
+    expect(r.json.order.timeline.find((e: Json) => e.kind === "contact_changed").data).toMatchObject({ field: "email", from: "rick@exmaple.com", to: "rick@example.com" });
+    const sent = await env.DB.prepare("SELECT to_email FROM outbox WHERE order_id = ? ORDER BY id").bind(id).all<{ to_email: string }>();
+    expect(sent.results.map((x) => x.to_email)).toEqual(["rick@exmaple.com", "rick@example.com"]);
+  });
+
+  it("picks up an email corrected in Shopify", async () => {
+    const o = sampleShopifyOrder({ id: 5550030, name: "514860030", email: "rick.hanson@example.com" });
+    await sendWebhook("orders/updated", o);
+    const row = await env.DB.prepare("SELECT customer_email FROM orders WHERE shopify_order_id = '5550030'").first<{ customer_email: string }>();
+    expect(row!.customer_email).toBe("rick.hanson@example.com");
+  });
+});

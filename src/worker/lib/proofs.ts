@@ -352,6 +352,49 @@ async function openProofMachines(db: D1Database, orderId: number): Promise<strin
   return results.map((r) => r.machine);
 }
 
+export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/**
+ * Corrects the customer's email or phone on the order (a typo, or a different person handling the order).
+ * Logged with who changed it and the old and new value. Optionally emails any waiting proof to the new address.
+ */
+export async function updateContact(
+  env: Env,
+  orderId: number,
+  by: Person,
+  input: { email?: string; phone?: string; resendProof?: boolean; origin: string },
+): Promise<{ resent: boolean }> {
+  const order = await getOrder(env.DB, orderId);
+  const stmts: D1PreparedStatement[] = [];
+  const changes: { field: string; from: string | null; to: string | null }[] = [];
+  if (input.email !== undefined) {
+    const email = input.email.trim();
+    if (!EMAIL_PATTERN.test(email)) throw new WorkflowError("That email address doesn't look right");
+    if (email !== order.customer_email) changes.push({ field: "email", from: order.customer_email, to: email });
+  }
+  if (input.phone !== undefined) {
+    const phone = input.phone.trim() || null;
+    if (phone !== order.customer_phone) changes.push({ field: "phone", from: order.customer_phone, to: phone });
+  }
+  for (const c of changes) {
+    stmts.push(
+      env.DB.prepare(`UPDATE orders SET ${c.field === "email" ? "customer_email" : "customer_phone"} = ? WHERE id = ?`).bind(c.to, orderId),
+      addEvent(env.DB, { orderId, kind: "contact_changed", personId: by.id, data: c }),
+    );
+  }
+  if (stmts.length) await env.DB.batch(stmts);
+  const emailChanged = changes.some((c) => c.field === "email");
+  if (!emailChanged || !input.resendProof) return { resent: false };
+  // Send the waiting proof to the corrected address, as a proof-ready or revision-ready email.
+  const machines = await openProofMachines(env.DB, orderId);
+  if (!machines.length) return { resent: false };
+  const latest = await env.DB.prepare("SELECT MAX(number) AS n FROM proofs WHERE order_id = ? AND status = 'open'").bind(orderId).first<{ n: number }>();
+  const updated = await getOrder(env.DB, orderId);
+  const resent = await emailCustomer(env, updated, (latest?.n ?? 1) > 1 ? "revision_ready" : "proof_ready", machines, { origin: input.origin, sentBy: by.id });
+  if (resent) await addEvent(env.DB, { orderId, kind: "proof_resent", personId: by.id, data: { to: updated.customer_email } }).run();
+  return { resent };
+}
+
 /** A reminder sent by hand from the order. Logged with who sent it. */
 export async function sendReminder(env: Env, orderId: number, by: Person, origin: string) {
   const order = await getOrder(env.DB, orderId);

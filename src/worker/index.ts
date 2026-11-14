@@ -51,6 +51,7 @@ import {
   fileForCustomer,
   fileResponse,
   markRead,
+  updateContact,
   proofLink,
   proofsForStaff,
   runReminders,
@@ -420,6 +421,15 @@ api.post("/orders/:id/reminder", async (c) => {
   await sendReminder(c.env, idParam(c), c.get("person"), origin(c));
   deliverLater(c);
   return c.json(await fullOrder(c));
+});
+
+// Fix the customer's email or phone. The order's designer, the team lead, Nikki and TY can do this.
+api.patch("/orders/:id/contact", async (c) => {
+  await loadForWork(c);
+  const b = await c.req.json<{ email?: string; phone?: string; resendProof?: boolean }>();
+  const result = await updateContact(c.env, idParam(c), c.get("person"), { ...b, origin: origin(c) });
+  deliverLater(c);
+  return c.json({ ...result, order: await fullOrder(c) });
 });
 
 // The customer link, made on demand so it can be copied before the first proof goes out.

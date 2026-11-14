@@ -209,7 +209,11 @@ export async function ingestShopifyOrder(db: D1Database, m: MappedOrder): Promis
 }
 
 /** Keeps payment status in step with Shopify, and pulls cancelled orders out of the queues. */
-export async function updateFromShopify(db: D1Database, shopifyId: string, payload: { financial_status?: string; cancelled_at?: string | null }) {
+export async function updateFromShopify(
+  db: D1Database,
+  shopifyId: string,
+  payload: { financial_status?: string; cancelled_at?: string | null; email?: string | null; phone?: string | null },
+) {
   const o = await db.prepare("SELECT * FROM orders WHERE shopify_order_id = ?").bind(shopifyId).first<OrderRow>();
   if (!o) return null;
   const stmts: D1PreparedStatement[] = [];
@@ -218,6 +222,14 @@ export async function updateFromShopify(db: D1Database, shopifyId: string, paylo
   }
   if (payload.cancelled_at && o.stage !== "cancelled") {
     stmts.push(setStage(db, o.id, "cancelled"), addEvent(db, { orderId: o.id, kind: "cancelled", note: "Cancelled in Shopify" }));
+  }
+  // A customer email corrected in Shopify is used for proof emails from then on.
+  const email = payload.email?.trim();
+  if (email && email.toLowerCase() !== (o.customer_email ?? "").toLowerCase()) {
+    stmts.push(
+      db.prepare("UPDATE orders SET customer_email = ? WHERE id = ?").bind(email, o.id),
+      addEvent(db, { orderId: o.id, kind: "contact_changed", note: "Changed in Shopify", data: { field: "email", from: o.customer_email, to: email } }),
+    );
   }
   if (stmts.length) await db.batch(stmts);
   return o.id;
