@@ -26,7 +26,8 @@ export async function upload<T = any>(path: string, form: FormData): Promise<T> 
   try {
     res = await fetch(`/api${path}`, { method: "POST", body: form, credentials: "same-origin" });
   } catch {
-    throw new ApiError("The upload didn't reach the app. Check your internet connection and try again.", 0);
+    // Usually a file in OneDrive that isn't on this computer right now (OneDrive closed or the file is online-only).
+    throw new ApiError("The file couldn't be read. If it's in OneDrive, make sure OneDrive is running and the file is downloaded, then pick it again.", 0);
   }
   return readResponse<T>(res);
 }
