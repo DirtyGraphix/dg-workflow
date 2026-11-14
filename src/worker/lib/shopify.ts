@@ -12,6 +12,10 @@
 // - Matching Wrapped Yetis are printed at the end of the run with the approved machine design.
 //   They need a print length but no proof, and the customer never sees them.
 // - Application kits, ADHESOFF, apparel and similar products skip design and just ship.
+// - The new product page (product-page-v2, live on the CAT 255/250 from Nov 14, 2026) replaces Globo.
+//   It links option lines with "_dg_group" / "_dg_parent_group" / "_dg_field", puts the chosen model in a
+//   "Model" property, and adds the finish as priced lines ("Wrap Finish", "Print Material") carrying
+//   "_dg_finish". Machine options with a price ("Model Options", e.g. Hydraulic Guard) are part of the kit.
 //
 // Hard rule: no price, total or amount is ever copied out of the Shopify payload. Option values like
 // "Gravel Guard [$0.31]" have the bracketed price removed. Only the payment *status* is kept.
@@ -66,6 +70,8 @@ export interface IntakeSettings {
   otherDesignPatterns: string[];
   /** Printed with the order using the approved machine design, no proof (e.g. matching Yetis). */
   matchingPatterns: string[];
+  /** Priced option lines that are part of the kit's design, not something that ships (e.g. "Model Options"). */
+  optionPatterns: string[];
 }
 
 export const DEFAULT_INTAKE: IntakeSettings = {
@@ -76,6 +82,7 @@ export const DEFAULT_INTAKE: IntakeSettings = {
   sheetzPatterns: ["sheetz"],
   otherDesignPatterns: ["decals"],
   matchingPatterns: ["matching wrapped"],
+  optionPatterns: ["model options"],
 };
 
 export type JobKind = "kit" | "sheetz" | "design" | "matching";
@@ -159,6 +166,10 @@ const variantSegments = (item: Shopify): string[] =>
     .filter((s) => s && !/default title$/i.test(s));
 const isRushItem = (item: Shopify) => /\brush\b/i.test(`${item.title ?? ""} ${item.variant_title ?? ""}`);
 const isFinishLine = (item: Shopify) => /\bfinish(es)?\b/i.test(String(item.title ?? "")) && !!parseFinish(item.variant_title);
+// Globo and the new product page link option lines to their kit in the same way, under different names.
+const groupOf = (item: Shopify) => prop(item, "_gpo_product_group") ?? prop(item, "_dg_group");
+const parentGroupOf = (item: Shopify) => prop(item, "_gpo_parent_product_group") ?? prop(item, "_dg_parent_group");
+const fieldOf = (item: Shopify) => prop(item, "_gpo_field_name") ?? prop(item, "_dg_field");
 const MODEL_CODE = /^[A-Z]{1,5}[\s-]?\d{2,4}[A-Z0-9-]*$/i;
 
 /** "2025+ Bobcat T770/S770 Wrap Kits" → "Bobcat T770/S770" */
@@ -176,6 +187,13 @@ function kitIdentity(item: Shopify, kind: JobKind): { machine: string; kit: stri
   const segs = variantSegments(item);
   if (kind === "sheetz") return { machine: `Sheetz${segs.length ? ` ${segs.join(" / ")}` : ""}`, kit: "Sheetz" };
   if (kind === "design" || kind === "matching") return { machine: title, kit: segs.length ? segs.join(" / ") : null };
+  // New product page: the customer picks the exact model ("CAT 250" on the CAT 255/250 page).
+  const picked = prop(item, "Model");
+  if (picked) {
+    const brand = BRANDS.find((b) => new RegExp(`\\b${b}\\b`, "i").test(title));
+    const machine = brand && !new RegExp(`\\b${brand}\\b`, "i").test(picked) ? `${brand} ${picked}` : picked;
+    return { machine, kit: segs.length ? segs.join(" / ") : null };
+  }
   const model = segs.find((s) => MODEL_CODE.test(s));
   if (model) {
     // Limited-edition kits: the variant is the machine model and the product is the kit.
@@ -188,12 +206,14 @@ function kitIdentity(item: Shopify, kind: JobKind): { machine: string; kit: stri
 
 function selectionsFor(item: Shopify): { name: string; value: string }[] {
   const out: { name: string; value: string }[] = [];
+  const modelIsMachine = !!prop(item, "Model");
   for (const p of props(item)) {
     let name = String(p.name ?? "").trim();
     const raw = clean(p.value);
     if (!name || !raw || name.startsWith("_") || isUrl(raw)) continue;
     const lower = name.toLowerCase();
     if (FINISH_KEYS.includes(lower) || HIDDEN_KEYS.includes(lower)) continue;
+    if (lower === "model" && modelIsMachine) continue; // already the machine name
     const value = stripPrices(raw);
     if (!value || /add application kit/i.test(value)) continue; // shown as a ship item instead
     if (/^(radio|buttons|dropdown|checkbox|select)-\d+$/i.test(name)) name = "Option";
@@ -224,7 +244,7 @@ export function mapShopifyOrder(o: Shopify, settings: IntakeSettings = DEFAULT_I
   // Pass 1: design jobs.
   for (const item of items) {
     const title = String(item.title ?? "");
-    if (prop(item, "_gpo_parent_product_group")) {
+    if (parentGroupOf(item)) {
       children.push(item);
       continue;
     }
@@ -254,21 +274,33 @@ export function mapShopifyOrder(o: Shopify, settings: IntakeSettings = DEFAULT_I
       finish: parseFinish(finishProp ? stripPrices(finishProp) : null) ?? (kind === "kit" ? parseFinish(item.variant_title) ?? parseFinish(title) : null),
       selections: [...selectionsFor(item), ...(Number(item.quantity ?? 1) > 1 ? [{ name: "Quantity", value: String(item.quantity) }] : [])],
     };
-    const group = prop(item, "_gpo_product_group");
+    const group = groupOf(item);
     if (group) byGroup.set(group, machine);
     machines.push(machine);
   }
 
-  // Pass 2: option lines linked to a design job (Finish, Application Kit, ...).
+  // Pass 2: option lines linked to a design job (Finish, Application Kit, Model Options, ...).
   for (const child of children) {
-    const parent = byGroup.get(prop(child, "_gpo_parent_product_group")!);
-    const field = (prop(child, "_gpo_field_name") ?? "").toLowerCase();
-    const finish = parseFinish(child.variant_title);
-    if (finish && (field.includes("finish") || /finish/i.test(String(child.title ?? "")))) {
+    const parent = byGroup.get(parentGroupOf(child)!);
+    const fieldName = fieldOf(child) ?? "";
+    const field = fieldName.toLowerCase();
+    // The new page names the finish outright; its "Print Material" line is the same finish, priced separately.
+    const namedFinish = prop(child, "_dg_finish");
+    const finish = parseFinish(namedFinish) ?? parseFinish(child.variant_title);
+    if (namedFinish || (finish && (field.includes("finish") || /finish/i.test(String(child.title ?? ""))))) {
       if (parent && !parent.finish) parent.finish = finish;
       continue;
     }
     if (isRushItem(child)) continue;
+    // Priced machine options (e.g. Hydraulic Guard) are part of the kit's design, not a separate item.
+    if (matches(String(child.title ?? ""), settings.optionPatterns)) {
+      const value = clean(variantSegments(child).join(" / ")) ?? clean(child.title) ?? "Yes";
+      const name = fieldName || clean(child.title) || "Option";
+      if (parent && !parent.selections.some((s) => s.name.toLowerCase() === name.toLowerCase() || s.value.toLowerCase() === value.toLowerCase())) {
+        parent.selections.push({ name, value: stripPrices(value) });
+      }
+      continue;
+    }
     shipItems.push({
       shopifyLineId: String(child.id),
       title: clean(child.title) ?? "Item",

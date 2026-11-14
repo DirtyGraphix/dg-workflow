@@ -1,6 +1,6 @@
 # dg-workflow
 
-Design and production workflow app for Dirty Graphix. It runs on Cloudflare (Workers, D1) with a React front end.
+Design and production workflow app for Dirty Graphix. It runs on Cloudflare (Workers, D1, R2, Email Service) with a React front end.
 
 - `docs/workflow-spec.md`: how the whole system works, with every rule and decision
 - `design/`: the approved look (rules, tokens, mockup screenshots and mockup sources)
@@ -16,7 +16,16 @@ Design and production workflow app for Dirty Graphix. It runs on Cloudflare (Wor
 - **Manual jobs** for orders that didn't come through Shopify.
 - **Business-hours clock:** Monday to Friday, 8:00 AM to 4:30 PM Central, skipping the six holidays.
 
-Next up is Phase 2: the customer proof page that replaces Approve Pro, and the Klaviyo emails.
+## What's built (Phase 2: proof page, replacing Approve Pro)
+
+- **Customer proof page** at `/proof/<link>` (or `dirtygraphix.com/apps/proof/<link>` once the app proxy is set up). Dark Dirty Graphix look from `design/screens/09-proof-page.png`. Customers approve (with a confirm step), ask for changes with photos or logo files, take back an approval within 30 minutes, download the approved design, and message their designer. An APPROVED or CHANGES REQUESTED stamp shows over the proof once they decide.
+- **Sending proofs:** designers drag in the proof image on the order, pick which machines it covers (one sheet for all, or one per machine so the customer can approve them one at a time), add a note or a reply template, and send. Each proof shows when the customer opened it.
+- **Conversation on the order:** customer changes and messages land on the order, flag it "CUSTOMER WROTE" in the queue, and designers answer from the order. Nothing lives in a personal inbox.
+- **Reminders:** automatic while a proof waits (every 2 days, up to 4, never past 28 days, business hours only), plus "Send reminder" on the order.
+- **Proof settings (TY):** the Approve Pro options that still apply: change window, revision history, downloads, uploads, comment rules, approval checklist, all page wording, reminders, each customer email on/off with editable wording and a preview, BCC, reply templates, and a log of recent emails.
+- **Emails** queue in the app first, then go out through Cloudflare Email Service in one branded layout built from `design/tokens.css`. Nothing sends until TY turns on sending in Proof settings; until then the log shows them as waiting. "Send test to me" checks the setup first.
+
+Next up is Phase 3: production (roll planner, production screen, receive material and labels).
 
 ## Run it on a computer (for development)
 
@@ -26,7 +35,7 @@ You need Node.js 22.
 npm install
 cp .dev.vars.example .dev.vars
 npm run dev          # builds the app and starts it at http://localhost:8787
-npm run seed:dev     # in a second terminal: adds the team and sample orders
+npm run seed:dev     # in a second terminal: adds the team and sample orders and proofs
 ```
 
 Sign in with `ty@dev.local` (or any team member's first name `@dev.local`) and the password `dirtygraphix-dev`.
@@ -35,12 +44,16 @@ Sign in with `ty@dev.local` (or any team member's first name `@dev.local`) and t
 
 ## Going live (one-time setup on Cloudflare and Shopify)
 
+**Database changes:** a new file in `migrations/` must be applied to the live database before its pull request is merged: `npx wrangler d1 migrations apply dg-workflow --remote` (or Claude applies it through the Cloudflare connection and records it in `d1_migrations`).
+
 These steps need TY's accounts. Claude can walk through each one.
 
-1. **Create the database:** `npx wrangler d1 create dg-workflow`, then paste the `database_id` it prints into `wrangler.jsonc`.
-2. **Set the secrets** (never put these in the code):
-   - `npx wrangler secret put SETUP_TOKEN`: any long random phrase, used once to create TY's admin login.
-   - `npx wrangler secret put SHOPIFY_WEBHOOK_SECRET`: from the Shopify app's settings (step 4).
-3. **Deploy:** `npm run deploy`. Then open `/setup` on the live app and create the admin login with the setup token.
-4. **Connect Shopify:** create a custom app for the store and subscribe these webhooks to `https://<app address>/webhooks/shopify`: `orders/create`, `orders/updated`, `orders/paid`, `orders/cancelled`.
-5. **Add the team** on the People screen.
+1. **Database and file storage** (done Nov 14, 2026): D1 database `dg-workflow` and R2 bucket `dg-workflow-proofs` in the Dirty Graphix Cloudflare account, with migrations 0001 and 0002 applied.
+2. **Deploys:** Cloudflare Workers Builds is linked to this GitHub repo and deploys `main` on every merge (build command `npm run build`, deploy command `npx wrangler deploy`).
+3. **Secrets** (set in Cloudflare under the Worker's Settings → Variables and Secrets, never in the code): `SETUP_TOKEN` (any long random phrase, used once to create TY's login) and, at Shopify hookup, `SHOPIFY_WEBHOOK_SECRET`.
+4. **First login:** open `/setup` on the live app and create the admin login with the setup token.
+5. **Connect Shopify:** create a custom app for the store and subscribe these webhooks to `https://<app address>/webhooks/shopify`: `orders/create`, `orders/updated`, `orders/paid`, `orders/cancelled`.
+6. **Add the team** on the People screen.
+7. **Proof links on dirtygraphix.com (recommended):** in the Shopify custom app, add an app proxy with prefix `apps`, subpath `proof`, and proxy URL `https://<app address>/proof`. Then enter `https://dirtygraphix.com/apps/proof` under Proof settings → Customer link address.
+8. **Customer emails:** the Cloudflare account needs the Workers Paid plan ($5/month, 3,000 emails a month included). In the Cloudflare dashboard, set up dirtygraphix.com for sending under Email Service and add the DNS records it lists. In Proof settings, check the sender (no_reply@dirtygraphix.com), click "Send test to me", and once it arrives, turn on "Send customer emails".
+9. **Launch day:** new orders use the proof page. Orders already in Approve Pro finish there (designers mark them "sent in Approve Pro"), then export Approve Pro's records and cancel it.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { mapShopifyOrder, parseFinish, stripPrices, DEFAULT_INTAKE } from "../src/worker/lib/shopify";
-import { sampleShopifyOrder, sheetzShopifyOrder, shipOnlyShopifyOrder } from "./fixtures";
+import { newPageShopifyOrder, sampleShopifyOrder, sheetzShopifyOrder, shipOnlyShopifyOrder } from "./fixtures";
 
 describe("parseFinish and stripPrices", () => {
   it("prefers the longest finish name", () => {
@@ -127,5 +127,30 @@ describe("ship-only orders and flags", () => {
     expect(rush.isRush).toBe(true);
     expect(rush.shipItems.map((i) => i.title)).not.toContain("Rush Order Upgrade");
     expect(mapShopifyOrder(sampleShopifyOrder({ customer: { first_name: "D", tags: "dealer-b2b" } })).isDealer).toBe(true);
+  });
+});
+
+describe("orders from the new product page (CAT 255/250, product-page-v2)", () => {
+  const m = mapShopifyOrder(newPageShopifyOrder());
+
+  it("names the machine from the model the customer picked, with the finish from the page", () => {
+    expect(m.machines).toHaveLength(1);
+    expect(m.machines[0]).toMatchObject({ kind: "kit", machine: "CAT 250", kit: "CYNICAL / Full (pictured)", finish: "CM", needsProof: true });
+  });
+
+  it("keeps machine options on the kit and doesn't ship finish or option price lines", () => {
+    const names = m.machines[0].selections.map((s) => s.name);
+    expect(names).toEqual(["Year", "Hydraulic guard/cover", "Color Options", "Custom Text", "Font", "Text Location", "Message", "Base", "Accent 1"]);
+    expect(m.shipItems.map((i) => [i.title, i.attachedToLineId])).toEqual([["Application Kit", "9100"]]);
+  });
+
+  it("lists the customer's logos from DG's own storage as uploads", () => {
+    expect(m.uploads.map((u) => u.name)).toEqual(["Logo 1", "Logo 2"]);
+    expect(m.uploads[0].url).toMatch(/^https:\/\/dirtygraphix\.com\/apps\/designer\/asset\/uploads\//);
+  });
+
+  it("never carries a price", () => {
+    const text = JSON.stringify(m);
+    for (const amount of ["1299", "49.00", "$"]) expect(text).not.toContain(amount);
   });
 });

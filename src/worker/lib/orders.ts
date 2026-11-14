@@ -65,6 +65,8 @@ export interface OrderRow {
   print_file_paused_at: string | null;
   print_file_paused_by: number | null;
   print_file_pause_reason: string | null;
+  proof_token: string | null;
+  customer_unread: number;
 }
 
 export interface MachineRow {
@@ -112,6 +114,7 @@ export async function intakeSettings(db: D1Database): Promise<IntakeSettings> {
     sheetzPatterns: listSetting(s.design_sheetz_patterns),
     otherDesignPatterns: listSetting(s.design_other_patterns),
     matchingPatterns: listSetting(s.design_matching_patterns),
+    optionPatterns: listSetting(s.design_option_patterns ?? "model options"),
   };
 }
 
@@ -134,18 +137,18 @@ export function machineDue(order: OrderRow, machine: MachineRow, clock: ClockOpt
 
 // ---------- reads ----------
 
-async function getOrder(db: D1Database, id: number): Promise<OrderRow> {
+export async function getOrder(db: D1Database, id: number): Promise<OrderRow> {
   const o = await db.prepare("SELECT * FROM orders WHERE id = ?").bind(id).first<OrderRow>();
   if (!o) throw new WorkflowError("Order not found", 404);
   return o;
 }
 
-async function getMachines(db: D1Database, orderId: number): Promise<MachineRow[]> {
+export async function getMachines(db: D1Database, orderId: number): Promise<MachineRow[]> {
   const { results } = await db.prepare("SELECT * FROM machines WHERE order_id = ? ORDER BY position, id").bind(orderId).all<MachineRow>();
   return results;
 }
 
-function addEvent(
+export function addEvent(
   db: D1Database,
   e: { orderId: number; machineId?: number | null; kind: string; personId?: number | null; note?: string | null; data?: unknown; at?: string },
 ) {
@@ -154,7 +157,7 @@ function addEvent(
     .bind(e.orderId, e.machineId ?? null, e.kind, e.at ?? now(), e.personId ?? null, e.note ?? null, e.data === undefined ? null : JSON.stringify(e.data));
 }
 
-function setStage(db: D1Database, orderId: number, stage: Stage, at = now()) {
+export function setStage(db: D1Database, orderId: number, stage: Stage, at = now()) {
   return db.prepare("UPDATE orders SET stage = ?, stage_since = ? WHERE id = ?").bind(stage, at, orderId);
 }
 
@@ -323,9 +326,8 @@ export const APPROVAL_METHODS = ["approve_pro", "phone", "in_person", "text", "e
 export type ApprovalMethod = (typeof APPROVAL_METHODS)[number];
 
 /**
- * Records a customer approval for some or all machines. Online approvals arrive in Phase 2;
- * until then designers record Approve Pro, phone, in-person and text approvals here.
- * A note is always required.
+ * Records an approval the customer gave outside the proof page (phone, in person, text, email, or an
+ * order finishing in Approve Pro). A note is always required. Proof page approvals go through proofs.ts.
  */
 export async function recordApproval(
   db: D1Database,
@@ -342,31 +344,46 @@ export async function recordApproval(
   const proofed = machines.filter((m) => m.needs_proof);
   const targets = input.machineIds?.length ? proofed.filter((m) => input.machineIds!.includes(m.id)) : proofed;
   if (!targets.length) throw new WorkflowError("No machines to approve");
+  const stmts = approvalStatements(db, orderId, machines, targets, { method: input.method, personId: by.id, note: input.note.trim() });
+  if (input.method === "approve_pro") stmts.push(db.prepare("UPDATE orders SET in_approve_pro = 1 WHERE id = ?").bind(orderId));
+  await db.batch(stmts);
+}
+
+/**
+ * The writes for an approval, used by manual approvals and the customer proof page.
+ * Once every proofed design is approved, matching items (Yetis) are approved with them and the order moves to approved.
+ */
+export function approvalStatements(
+  db: D1Database,
+  orderId: number,
+  machines: MachineRow[],
+  targets: MachineRow[],
+  e: { method: string; personId: number | null; note: string | null; data?: Record<string, unknown> },
+): D1PreparedStatement[] {
   const at = now();
+  const proofed = machines.filter((m) => m.needs_proof);
   const stmts: D1PreparedStatement[] = targets
     .filter((m) => !m.approved_at)
-    .map((m) => db.prepare("UPDATE machines SET approved_at = ?, approval_method = ? WHERE id = ?").bind(at, input.method, m.id));
+    .map((m) => db.prepare("UPDATE machines SET approved_at = ?, approval_method = ? WHERE id = ?").bind(at, e.method, m.id));
   const approvedIds = new Set([...proofed.filter((m) => m.approved_at).map((m) => m.id), ...targets.map((m) => m.id)]);
   const allApproved = proofed.every((m) => approvedIds.has(m.id));
-  // Once every proofed design is approved, matching items (Yetis) are approved with them.
   if (allApproved) {
     for (const m of machines.filter((x) => !x.needs_proof && !x.approved_at)) {
       stmts.push(db.prepare("UPDATE machines SET approved_at = ?, approval_method = 'matches_machine' WHERE id = ?").bind(at, m.id));
     }
+    stmts.push(setStage(db, orderId, "approved", at));
   }
-  if (allApproved) stmts.push(setStage(db, orderId, "approved", at));
-  if (input.method === "approve_pro") stmts.push(db.prepare("UPDATE orders SET in_approve_pro = 1 WHERE id = ?").bind(orderId));
   stmts.push(
     addEvent(db, {
       orderId,
       kind: "approved",
-      personId: by.id,
-      note: input.note.trim(),
-      data: { method: input.method, machineIds: targets.map((m) => m.id), all: allApproved },
+      personId: e.personId,
+      note: e.note,
+      data: { method: e.method, machineIds: targets.map((m) => m.id), all: allApproved, ...e.data },
       at,
     }),
   );
-  await db.batch(stmts);
+  return stmts;
 }
 
 /** A customer's change request, recorded by hand. Counts as a revision request. */
@@ -567,6 +584,7 @@ export interface OrderSummary {
   machines: { id: number; machine: string; finish: FinishCode | null; kind: JobKind }[];
   printFileDue: string | null;
   printFilePaused: boolean;
+  customerUnread: boolean;
 }
 
 function summarize(o: OrderRow, machines: MachineRow[], clock: ClockOptions): OrderSummary {
@@ -585,6 +603,7 @@ function summarize(o: OrderRow, machines: MachineRow[], clock: ClockOptions): Or
     machines: machines.map((m) => ({ id: m.id, machine: m.machine, finish: m.finish, kind: m.kind })),
     printFileDue: dues[0] ?? null,
     printFilePaused: !!o.print_file_paused_at,
+    customerUnread: !!o.customer_unread,
   };
 }
 
