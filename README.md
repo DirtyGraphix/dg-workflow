@@ -44,14 +44,14 @@ Sign in with `ty@dev.local` (or any team member's first name `@dev.local`) and t
 
 ## Going live (one-time setup on Cloudflare and Shopify)
 
+**Database changes:** a new file in `migrations/` must be applied to the live database before its pull request is merged: `npx wrangler d1 migrations apply dg-workflow --remote` (or Claude applies it through the Cloudflare connection and records it in `d1_migrations`).
+
 These steps need TY's accounts. Claude can walk through each one.
 
-1. **Create the database:** `npx wrangler d1 create dg-workflow`, then paste the `database_id` it prints into `wrangler.jsonc`.
-2. **Set the secrets** (never put these in the code):
-   - `npx wrangler secret put SETUP_TOKEN`: any long random phrase, used once to create TY's admin login.
-   - `npx wrangler secret put SHOPIFY_WEBHOOK_SECRET`: from the Shopify app's settings.
-3. **Create the file storage** for proofs and customer uploads: `npx wrangler r2 bucket create dg-workflow-proofs`. After the first deploy, fill in `APP_ORIGIN` in `wrangler.jsonc` with the app's address so reminder emails link correctly.
-4. **Deploy:** `npm run deploy`. Then open `/setup` on the live app and create the admin login with the setup token.
+1. **Database and file storage** (done Nov 14, 2026): D1 database `dg-workflow` and R2 bucket `dg-workflow-proofs` in the Dirty Graphix Cloudflare account, with migrations 0001 and 0002 applied.
+2. **Deploys:** Cloudflare Workers Builds is linked to this GitHub repo and deploys `main` on every merge (build command `npm run build`, deploy command `npx wrangler deploy`).
+3. **Secrets** (set in Cloudflare under the Worker's Settings → Variables and Secrets, never in the code): `SETUP_TOKEN` (any long random phrase, used once to create TY's login) and, at Shopify hookup, `SHOPIFY_WEBHOOK_SECRET`.
+4. **First login:** open `/setup` on the live app and create the admin login with the setup token.
 5. **Connect Shopify:** create a custom app for the store and subscribe these webhooks to `https://<app address>/webhooks/shopify`: `orders/create`, `orders/updated`, `orders/paid`, `orders/cancelled`.
 6. **Add the team** on the People screen.
 7. **Proof links on dirtygraphix.com (recommended):** in the Shopify custom app, add an app proxy with prefix `apps`, subpath `proof`, and proxy URL `https://<app address>/proof`. Then enter `https://dirtygraphix.com/apps/proof` under Proof settings → Customer link address.

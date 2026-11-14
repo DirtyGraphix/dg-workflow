@@ -15,8 +15,7 @@
     {
       "binding": "DB",
       "database_name": "dg-workflow",
-      // Replaced with the real ID when the database is created in Cloudflare.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "641d9b66-6783-4dec-b829-fac1c80c7361",
       "migrations_dir": "migrations"
     }
   ],
