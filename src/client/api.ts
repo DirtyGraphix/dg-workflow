@@ -147,6 +147,7 @@ export interface OrderDetail extends OrderSummary {
   proofs: ProofView[];
   messages: MessageView[];
   customerLink: string | null;
+  viewers: { id: number; email: string; addedAt: string; addedBy: string | null }[];
 }
 
 export interface FileView {

@@ -52,6 +52,9 @@ import {
   fileResponse,
   markRead,
   updateContact,
+  addViewer,
+  removeViewer,
+  contactsFor,
   proofLink,
   proofsForStaff,
   runReminders,
@@ -374,6 +377,7 @@ async function fullOrder(c: Context<AppEnv>, id = idParam(c)) {
   return {
     ...detail,
     ...proofs,
+    viewers: await contactsFor(c.env.DB, id),
     customerUnread: !!row?.customer_unread,
     customerLink: row?.proof_token ? proofLink(settings, origin(c), row.proof_token) : null,
   };
@@ -430,6 +434,21 @@ api.patch("/orders/:id/contact", async (c) => {
   const result = await updateContact(c.env, idParam(c), c.get("person"), { ...b, origin: origin(c) });
   deliverLater(c);
   return c.json({ ...result, order: await fullOrder(c) });
+});
+
+// Extra people who get a view-only copy of each proof.
+api.post("/orders/:id/viewers", async (c) => {
+  await loadForWork(c);
+  const b = await c.req.json<{ email: string; sendNow?: boolean }>();
+  const result = await addViewer(c.env, idParam(c), c.get("person"), { ...b, origin: origin(c) });
+  deliverLater(c);
+  return c.json({ ...result, order: await fullOrder(c) }, 201);
+});
+
+api.delete("/orders/:id/viewers/:viewerId", async (c) => {
+  await loadForWork(c);
+  await removeViewer(c.env, idParam(c), Number(c.req.param("viewerId")), c.get("person"));
+  return c.json(await fullOrder(c));
 });
 
 // The customer link, made on demand so it can be copied before the first proof goes out.

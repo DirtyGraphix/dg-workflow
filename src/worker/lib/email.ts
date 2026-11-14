@@ -6,7 +6,7 @@
 import type { Env } from "../env";
 import tokensCss from "../../../design/tokens.css";
 
-export const EMAIL_KINDS = ["proof_ready", "revision_ready", "reminder", "approved", "changes_received", "reply", "message"] as const;
+export const EMAIL_KINDS = ["proof_ready", "revision_ready", "reminder", "approved", "changes_received", "reply", "message", "viewer_copy"] as const;
 export type EmailKind = (typeof EMAIL_KINDS)[number];
 
 export const EMAIL_LABELS: Record<EmailKind, { name: string; when: string }> = {
@@ -17,6 +17,7 @@ export const EMAIL_LABELS: Record<EmailKind, { name: string; when: string }> = {
   changes_received: { name: "Changes received", when: "After the customer asks for changes" },
   reply: { name: "Reply from designer", when: "When the designer answers the customer on the order" },
   message: { name: "Message customer", when: "When the designer writes before any proof has gone out" },
+  viewer_copy: { name: "Copy for extra people", when: "To the extra people on an order, each time a proof or revision goes out (view only)" },
 };
 
 export interface EmailTemplate {
@@ -42,6 +43,7 @@ export interface EmailVars {
   designer: string;
   machines: string;
   message?: string;
+  customer_name?: string;
 }
 
 /** Fills {placeholders}. Unknown placeholders are left as typed so a typo is easy to spot. */

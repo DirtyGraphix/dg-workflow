@@ -68,6 +68,10 @@ function timelineLabel(e: TimelineEvent, order: OrderDetail, proofIndex: number)
       return "Cancelled";
     case "contact_changed":
       return `Customer ${e.data?.field ?? "contact"} changed${e.person ? ` by ${e.person}` : e.note ? ` (${e.note.toLowerCase()})` : ""} · ${e.data?.from ?? "none"} → ${e.data?.to ?? "none"}`;
+    case "viewer_added":
+      return `${e.data?.email ?? "Someone"} added to get proof copies (view only)${e.person ? ` by ${e.person}` : ""}`;
+    case "viewer_removed":
+      return `${e.data?.email ?? "Someone"} removed from proof copies${e.person ? ` by ${e.person}` : ""}`;
     case "proof_resent":
       return `Proof emailed again to ${e.data?.to ?? "the customer"}${e.person ? ` by ${e.person}` : ""}`;
     case "ship_only":
@@ -786,6 +790,81 @@ export function OrderPanel({ orderId, me, onChange }: { orderId: number; me: Me;
   );
 }
 
+/** Extra people who get a view-only copy of each proof. Only the main customer approves. */
+function Viewers({ order, onOrder }: { order: OrderDetail; onOrder: (o: OrderDetail) => void }) {
+  const [adding, setAdding] = useState(false);
+  const [email, setEmail] = useState("");
+  const proofWaiting = order.proofs.some((p) => p.status === "open");
+  const [sendNow, setSendNow] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const add = async () => {
+    setError(null);
+    try {
+      const r = await api<{ order: OrderDetail }>("POST", `/orders/${order.id}/viewers`, { email, sendNow: proofWaiting && sendNow });
+      onOrder(r.order);
+      setEmail("");
+      setAdding(false);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Couldn't add them");
+    }
+  };
+  const remove = async (id: number) => {
+    setError(null);
+    try {
+      onOrder(await api<OrderDetail>("DELETE", `/orders/${order.id}/viewers/${id}`));
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Couldn't remove them");
+    }
+  };
+  return (
+    <div className="stack" style={{ gap: 6 }}>
+      <span className="field__label">Also gets proof copies (view only)</span>
+      {order.viewers.length === 0 && !adding && <span className="small muted">Nobody else. Only {order.customer.name ?? "the customer"} gets proofs.</span>}
+      {order.viewers.map((v) => (
+        <div key={v.id} className="row" style={{ justifyContent: "space-between" }}>
+          <span>
+            {v.email} <span className="small muted">· added by {v.addedBy ?? "—"}</span>
+          </span>
+          <button type="button" className="btn btn--link" style={{ minHeight: 32 }} onClick={() => remove(v.id)}>
+            Remove
+          </button>
+        </div>
+      ))}
+      {adding ? (
+        <div className="form-box" style={{ marginTop: 0 }}>
+          <div className="field">
+            <label htmlFor="viewer-email">Their email</label>
+            <input id="viewer-email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. owner@hansonexcavating.com" />
+          </div>
+          {proofWaiting && (
+            <label className="check">
+              <input type="checkbox" checked={sendNow} onChange={(e) => setSendNow(e.target.checked)} />
+              Send them the waiting proof now
+            </label>
+          )}
+          <span className="small muted">They see each proof and its status but can't approve, ask for changes or see your messages with the customer.</span>
+          <ErrorNote error={error} />
+          <div className="row">
+            <button type="button" className="btn btn--dark" disabled={!email.trim()} onClick={add}>
+              Add
+            </button>
+            <button type="button" className="btn btn--link" onClick={() => setAdding(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <ErrorNote error={error} />
+          <button type="button" className="btn" style={{ alignSelf: "flex-start" }} onClick={() => setAdding(true)}>
+            Add someone
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 /** Contact and shipping, with a way to fix a mistyped email or phone. */
 function ContactDetails({ order, onOrder }: { order: OrderDetail; onOrder: (o: OrderDetail) => void }) {
   const [editing, setEditing] = useState(false);
@@ -852,6 +931,7 @@ function ContactDetails({ order, onOrder }: { order: OrderDetail; onOrder: (o: O
         <dt>Shipping</dt>
         <dd>{order.customer.shipMethod ?? "—"}</dd>
       </dl>
+      <Viewers order={order} onOrder={onOrder} />
       <div className="row">
         <button
           type="button"
