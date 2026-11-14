@@ -29,7 +29,10 @@ function QueueCard({ order, group, selected, onSelect }: { order: OrderSummary; 
     <button type="button" className="q-card" aria-current={selected ? "true" : undefined} onClick={onSelect}>
       <span className="q-card__top">
         <span className="q-card__order">{order.orderNumber}</span>
-        <OrderTags order={order} />
+        <span className="row">
+          {order.customerUnread && <span className="tag tag--rev">CUSTOMER WROTE</span>}
+          <OrderTags order={order} />
+        </span>
       </span>
       <span className="q-card__machine">{order.machines.map((m) => m.machine).join(" + ") || "No machines on this order"}</span>
       <span className="row">

@@ -15,7 +15,7 @@ Everything runs through Shopify plus one custom app, keeping outside apps to a m
 
 - **One custom web app connected to Shopify:** the design view, production screen, roll planner, checklists and reports. Everyone signs in with the app's own logins, not Shopify staff accounts. The store is on the Grow plan, which has 5 staff seats, so this keeps the seats free and lets people be added without upgrading. Native B2B is Plus-only, but dealers already run through the dealer-b2b Market, which works on Grow.
 - **Shopify stays the source of truth:** orders, customers, rush add-ons, shipping labels and fulfillment. A new order creates a job automatically, and marking the order fulfilled closes the job and sends Shopify's shipping email.
-- **Klaviyo, already in place,** sends the branded workflow emails.
+- **Cloudflare Email Service** sends the branded workflow emails straight from the app (switched from Klaviyo on Nov 14, 2026, so wording and look live in one place).
 - **Shopify Flow, built in,** handles small automations such as tagging rush orders.
 
 **What counts as a design job**
@@ -39,6 +39,18 @@ The built-in proof page replaces Approve Pro. That's one less app, proofs carry 
 3. Those orders still enter the new system at hand-off: the designer logs the length and marks it "approved in Approve Pro," so material and roll planning stay accurate.
 4. Their design stats are left out, since the early timestamps are missing.
 5. Once the last in-progress order is approved, export Approve Pro's approval records and cancel it.
+
+**How the proof page works** (built in Phase 2; defaults copy the Approve Pro settings in use in November 2026)
+
+- **Sending:** the designer drops the proof image on the order, picks the machines it covers, adds an optional note (or a reply template) and sends. A newer proof for the same machines replaces the open one. A proof sent by mistake can be taken back.
+- **Customer page:** the newest proof for each machine, its machine, kit, finish and designer, the designer's note, and the "Before you approve, check" list. Approve asks for confirmation. Changes need a comment (up to 500 characters) and can include up to 5 photos or logo files. No prices ever show.
+- **After deciding:** the proof shows an APPROVED or CHANGES REQUESTED stamp, like Approve Pro. Approved designs can be downloaded. An approval can be taken back within 30 minutes, as long as the job hasn't gone to production.
+- **Viewed:** the first and latest time the customer opened each proof show on the order. Staff opening the link don't count.
+- **Conversation:** customer changes and messages land on the order and flag it in the designer's queue until opened. The designer answers from the order and the customer gets an email with a link back. Before the first proof, the page lets the customer message their designer.
+- **Reminders:** while a proof waits, every 2 calendar days, at most 4, never past 28 days, sent during business hours only. Designers can send one by hand, logged with their name.
+- **Emails:** Proof ready, Revision ready, Reminder, Design approved, Reply from designer and Message customer are on; Changes received is off. TY can switch each one and edit its wording in Proof settings.
+- **Settings TY can change:** change window, revision history, download after approval, file uploads, comment on approval, longest comment, required approval checklist and its items, all page wording, reminder schedule, each email, BCC, reply templates, and the link address (dirtygraphix.com/apps/proof once the app proxy is set up).
+- **Not carried over from Approve Pro:** auto-approve, auto-assign (assignment works through Cierra's board), Approve Pro user accounts (the app has its own logins), page styling (the look is locked), order tags and the W3OS tag (W3OS is being retired), POS and draft order sync (see open items), data retention (orders stay on record).
 
 ## Order flow
 
@@ -249,7 +261,7 @@ Two emails cover the gap between approval and shipping. Shopify's existing shipp
 
 **Everything stays in the system.** All customer emails send from the no-reply address. A reply gets an automatic kickback pointing the customer to their order page. Each email links to that page, where the customer can approve, request changes, upload files, answer a question or send a message. Every response lands on the order's timeline, the designer is notified, and nothing lives in a personal inbox.
 
-**Proof emails (replacing Approve Pro's emails):** Proof ready (with the proof link), Revision ready, Reminders while a proof waits (automatic on a schedule to be set, or sent by hand from the order), and Approved (a thank-you confirmation). All of them, plus the two below, go out through Klaviyo on one branded template.
+**Proof emails (replacing Approve Pro's emails):** Proof ready (with the proof link), Revision ready, Reminders while a proof waits (automatic on a schedule to be set, or sent by hand from the order), and Approved (a thank-you confirmation). All of them, plus the two below, go out through Cloudflare Email Service on one branded layout.
 
 **1. In the production queue** (sent at hand-off)
 
@@ -384,13 +396,15 @@ Each finish fills its rolls oldest-first and gap-fills to 95%. Normal jobs never
 - [ ] Set efficiency score targets after the baseline month
 - [ ] Rush fee and turnaround promise
 - [ ] Add more scan points later (laminate, cut, QC, pack)?
+- [ ] Approve Pro syncs draft orders and POS orders today. Should draft orders (new-machine kits) reach design before they're paid?
+- [ ] The new CAT 255/250 product page (live Nov 14) replaces Globo options. Confirm its cart format before more models move over.
 
 ## Build plan
 
 TY builds it with Claude Code, in phases. Each phase is usable before the next starts. The look is locked: every screen follows design/DESIGN.md and design/tokens.css (saved in this project under workflow-app/) and must match its approved mockup screenshot before it's called done.
 
 1. **Foundation:** a custom Shopify app with its own database. New orders arrive by webhook and become jobs. Includes team lead assignment, the designer view (timer, checklist, length, hand-off) and manual jobs.
-2. **Proof page and emails:** a branded proof page served on dirtygraphix.com (like the customizer at /apps/designer), plus the Klaviyo emails. This replaces Approve Pro, so it has to be ready by launch day.
+2. **Proof page and emails:** a branded proof page served on dirtygraphix.com (like the customizer at /apps/designer), plus the customer emails. This replaces Approve Pro, so it has to be ready by launch day.
 3. **Production:** the roll planner (finishes, cut sections, Gravel Guard and Prismatic rolls, remnants), the production screen, receive material, and 4 x 6 and 3 x 2 labels sent to the Zebras.
 4. **Reports and screens:** the weekly and monthly emails, efficiency scores, both TVs and sounds.
 5. **Extras:** reprint and print-error flows, stalled orders, the rush on/off switch in the theme, true cost, and material forecasting.

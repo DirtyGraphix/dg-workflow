@@ -40,6 +40,11 @@ export function Shell({ me, title, actions, children }: { me: Me; title: string;
                 People
               </NavLink>
             )}
+            {me.role === "admin" && (
+              <NavLink className="app-header__btn" to="/settings/proofs">
+                Proof settings
+              </NavLink>
+            )}
             <button type="button" className="app-header__btn" onClick={signOut}>
               Sign out
             </button>

@@ -23,6 +23,15 @@ export async function api<T = any>(method: string, path: string, body?: unknown)
   return json as T;
 }
 
+/** Same as api(), for forms with files (proof uploads). */
+export async function upload<T = any>(path: string, form: FormData): Promise<T> {
+  const res = await fetch(`/api${path}`, { method: "POST", body: form, credentials: "same-origin" });
+  const text = await res.text();
+  const json = text ? JSON.parse(text) : null;
+  if (!res.ok) throw new ApiError(json?.error ?? "Something went wrong", res.status, json?.data ?? null);
+  return json as T;
+}
+
 export type FinishCode = "GL" | "MT" | "GG" | "CG" | "PR" | "CM" | "CP";
 export type Stage = "unassigned" | "needs_first_proof" | "proof_sent" | "revision_requested" | "approved" | "handed_off" | "ship_only" | "cancelled";
 export type JobKind = "kit" | "sheetz" | "design" | "matching";
@@ -50,6 +59,7 @@ export interface OrderSummary {
   machines: { id: number; machine: string; finish: FinishCode | null; kind: JobKind }[];
   printFileDue: string | null;
   printFilePaused: boolean;
+  customerUnread: boolean;
 }
 
 export interface QueueGroup {
@@ -115,6 +125,50 @@ export interface OrderDetail extends OrderSummary {
   machines: MachineView[];
   shipItems: { title: string; variant: string | null; quantity: number; attachedTo: number | null }[];
   timeline: TimelineEvent[];
+  proofs: ProofView[];
+  messages: MessageView[];
+  customerLink: string | null;
+}
+
+export interface FileView {
+  id: number;
+  filename: string;
+  contentType: string;
+  size: number;
+  url: string;
+}
+
+export type ProofStatus = "open" | "approved" | "changes_requested" | "replaced" | "withdrawn";
+
+export interface ProofView {
+  id: number;
+  number: number;
+  status: ProofStatus;
+  message: string | null;
+  sentAt: string;
+  sentBy: string | null;
+  decidedAt: string | null;
+  viewedAt: string | null;
+  lastViewedAt: string | null;
+  machineIds: number[];
+  files: FileView[];
+}
+
+export interface MessageView {
+  id: number;
+  proofId: number | null;
+  author: "customer" | "staff";
+  person: string | null;
+  kind: "changes" | "message" | "reply";
+  body: string;
+  createdAt: string;
+  files: FileView[];
+}
+
+export interface ReplyTemplate {
+  id: number;
+  name: string;
+  body: string;
 }
 
 export interface LengthCheck {

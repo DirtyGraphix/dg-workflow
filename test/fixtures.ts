@@ -134,3 +134,70 @@ export async function signWebhook(body: string, secret: string): Promise<string>
   const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body)));
   return btoa(String.fromCharCode(...sig));
 }
+
+/**
+ * An order from the new product page (product-page-v2), shaped like test order 514863586 on the
+ * CAT 255/250 page (Nov 14, 2026), with the personal details replaced.
+ */
+export function newPageShopifyOrder() {
+  const group = "1794655511018";
+  const child = (id: number, title: string, variant: string | null, extra: { name: string; value: string }[] = []) => ({
+    id,
+    title,
+    variant_title: variant,
+    price: "49.00",
+    quantity: 1,
+    properties: [{ name: "_dg_parent_group", value: group }, ...extra],
+  });
+  return {
+    id: 5550100,
+    name: "514869100",
+    created_at: "2026-11-14T11:27:57Z",
+    email: "pat@example.com",
+    financial_status: "paid",
+    tags: "",
+    customer: { first_name: "Pat", last_name: "Sample", email: "pat@example.com", tags: "" },
+    shipping_address: { name: "Pat Sample", address1: "1 Test Rd", city: "Stillwater", province_code: "MN", zip: "55082", country_code: "US" },
+    shipping_lines: [{ title: "Standard" }],
+    line_items: [
+      child(9101, "Model Options", "Hydraulic Guard", [{ name: "_dg_field", value: "Hydraulic guard/cover" }]),
+      child(9102, "Application Kit", null, [{ name: "_dg_field", value: "Application Kit" }]),
+      child(9103, "Wrap Finish", "Matte — Equipment Chrome Vinyl", [
+        { name: "_dg_field", value: "Finish Options" },
+        { name: "_dg_finish", value: "Chrome Matte" },
+        { name: "Machine", value: "CAT 255/250 Wrap Kits" },
+      ]),
+      child(9104, "Print Material", "Equipment Chrome Vinyl", [
+        { name: "_dg_field", value: "Finish Options" },
+        { name: "_dg_finish", value: "Chrome Matte" },
+        { name: "Machine", value: "CAT 255/250 Wrap Kits" },
+      ]),
+      {
+        id: 9100,
+        title: "CAT 255/250 Wrap Kits",
+        variant_title: "CYNICAL / Full (pictured)",
+        price: "1299.00",
+        quantity: 1,
+        properties: [
+          { name: "Model", value: "CAT 250" },
+          { name: "Year", value: "2024" },
+          { name: "Hydraulic guard/cover", value: "Add hydraulic guard/cover" },
+          { name: "Color Options", value: "Choose my own" },
+          { name: "Custom Text", value: "SAMPLE CO" },
+          { name: "Font", value: "Anton" },
+          { name: "Text Location", value: "Arm / Boom" },
+          { name: "Application Kit", value: "Yes! Add Application Kit" },
+          { name: "Message", value: "Let me know if something looks off." },
+          { name: "model/year check", value: "I confirm I have selected my exact model and year." },
+          { name: "Finish Options", value: "Chrome Matte" },
+          { name: "Base", value: "Sunburst Yellow" },
+          { name: "Accent 1", value: "Violet Purple" },
+          { name: "Logo 1", value: "https://dirtygraphix.com/apps/designer/asset/uploads/00000000-0000-0000-0000-000000000001/logo.png" },
+          { name: "Logo 2", value: "https://dirtygraphix.com/apps/designer/asset/uploads/00000000-0000-0000-0000-000000000002/logo.pdf" },
+          { name: "_dg_group", value: group },
+          { name: "_dg_source", value: "product-page-v2" },
+        ],
+      },
+    ],
+  };
+}

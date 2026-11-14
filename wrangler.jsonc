@@ -9,7 +9,7 @@
     "directory": "dist/client",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/webhooks/*"]
+    "run_worker_first": ["/api/*", "/webhooks/*", "/proof/*"]
   },
   "d1_databases": [
     {
@@ -20,9 +20,20 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Proof images and customer uploads.
+  "r2_buckets": [{ "binding": "PROOFS", "bucket_name": "dg-workflow-proofs" }],
+  // Customer emails, sent with Cloudflare Email Service. The sender address is set in Proof settings and
+  // its domain (dirtygraphix.com) must be set up for sending in the Cloudflare dashboard first.
+  "send_email": [{ "name": "EMAIL" }],
+  // The design tokens are read into the email layout, so emails use the same colors and fonts.
+  "rules": [{ "type": "Text", "globs": ["**/*.css"], "fallthrough": true }],
+  // Hourly job: proof reminders and email delivery.
+  "triggers": { "crons": ["0 * * * *"] },
   "vars": {
     "SHOP_TIMEZONE": "America/Chicago",
-    "SHOPIFY_SHOP_DOMAIN": "dirtygraphix.myshopify.com"
+    "SHOPIFY_SHOP_DOMAIN": "dirtygraphix.myshopify.com",
+    // This app's web address, filled in at go-live. Reminder emails sent by the hourly job link from it.
+    "APP_ORIGIN": ""
   }
   // Secrets (set with `wrangler secret put`, never committed):
   //   SHOPIFY_WEBHOOK_SECRET  verifies that order webhooks really came from Shopify
