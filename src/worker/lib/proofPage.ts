@@ -41,7 +41,10 @@ export function renderProofPage(v: CustomerView, ctx: PageContext): string {
   // Headline for where things stand, like Approve Pro's "Design approved!" and "Design rejected" pages.
   let title: string;
   let lead: string;
-  if (v.stage === "cancelled") {
+  if (v.viewOnly) {
+    title = open.length ? "A proof to look over" : allApproved || v.closed ? t("text_approved_title") : "Your design is in the works";
+    lead = `You're viewing a copy. ${v.customerFirstName} approves the design or asks ${v.designer} for changes.`;
+  } else if (v.stage === "cancelled") {
     title = "This order was cancelled";
     lead = "Questions? Give us a call.";
   } else if (ctx.done === "approved") {
@@ -97,7 +100,7 @@ export function renderProofPage(v: CustomerView, ctx: PageContext): string {
     const designer = p.designer ?? v.designer;
     const head = multi ? `<div class="pp-proof__head"><span class="pp-badge">${esc(p.label)}</span><h2 class="pp-h2">${esc(names)}</h2></div>` : "";
     let actions = "";
-    if (interactive && p.status === "open" && !v.closed) {
+    if (interactive && !v.viewOnly && p.status === "open" && !v.closed) {
       const draft = ctx.draft?.proofId === p.id ? ctx.draft : undefined;
       const checklist = ackItems.length
         ? requireAck
@@ -170,7 +173,7 @@ ${m.files.length ? `<div class="pp-files">${m.files.map((f) => `<a href="${fileU
     : "";
 
   const messageForm =
-    !open.length && !v.closed
+    !open.length && !v.closed && !v.viewOnly
       ? `<form class="pp-form" method="post" action="${action("message")}" enctype="multipart/form-data" data-once>
 <h2 class="pp-h2">Send ${esc(v.designer)} a message</h2>
 <label class="pp-label" for="msg">Questions, logo files, answers: it all goes straight to your designer.</label>
@@ -204,7 +207,7 @@ ${history}
 ${thread}
 ${messageForm}
 <footer class="pp-foot">
-<p>Questions? Use the box above. It goes straight to your designer. Replies to our emails aren’t monitored.</p>
+<p>${v.viewOnly ? `Questions about the design? Ask ${esc(v.customerFirstName)}, who's working with ${esc(v.designer)} on it.` : "Questions? Use the box above. It goes straight to your designer. Replies to our emails aren’t monitored."}</p>
 ${store}
 </footer>
 </main>

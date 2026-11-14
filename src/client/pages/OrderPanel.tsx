@@ -66,6 +66,14 @@ function timelineLabel(e: TimelineEvent, order: OrderDetail, proofIndex: number)
       return `Print file deadline resumed · ${hm(e.data?.pausedMinutes ?? 0)} added`;
     case "cancelled":
       return "Cancelled";
+    case "contact_changed":
+      return `Customer ${e.data?.field ?? "contact"} changed${e.person ? ` by ${e.person}` : e.note ? ` (${e.note.toLowerCase()})` : ""} · ${e.data?.from ?? "none"} → ${e.data?.to ?? "none"}`;
+    case "viewer_added":
+      return `${e.data?.email ?? "Someone"} added to get proof copies (view only)${e.person ? ` by ${e.person}` : ""}`;
+    case "viewer_removed":
+      return `${e.data?.email ?? "Someone"} removed from proof copies${e.person ? ` by ${e.person}` : ""}`;
+    case "proof_resent":
+      return `Proof emailed again to ${e.data?.to ?? "the customer"}${e.person ? ` by ${e.person}` : ""}`;
     case "ship_only":
       return "Sent to production to ship";
     default:
@@ -99,7 +107,7 @@ function Timeline({ order }: { order: OrderDetail }) {
             <span>
               <span className="strong">{timelineLabel(e, order, idx)}</span>
               <span className="muted"> · {dayTime(e.at)}{method}</span>
-              {e.note && !["assigned", "reassigned", "received", "message_sent", "customer_message"].includes(e.kind) && (
+              {e.note && !["assigned", "reassigned", "received", "message_sent", "customer_message", "contact_changed"].includes(e.kind) && (
                 <span className="timeline__note">
                   “{e.note}”{e.person ? ` · ${e.person}` : ""}
                 </span>
@@ -722,18 +730,7 @@ export function OrderPanel({ orderId, me, onChange }: { orderId: number; me: Me;
           <button type="button" className="btn btn--link" style={{ alignSelf: "flex-start", minHeight: 40 }} aria-expanded={contactOpen} onClick={() => setContactOpen(!contactOpen)}>
             {contactOpen ? "Hide contact and shipping" : "Show contact and shipping"}
           </button>
-          {contactOpen && (
-            <dl className="dl">
-              <dt>Email</dt>
-              <dd>{order.customer.email ?? "—"}</dd>
-              <dt>Phone</dt>
-              <dd>{order.customer.phone ?? "—"}</dd>
-              <dt>Ship to</dt>
-              <dd>{order.customer.shipTo ?? "—"}</dd>
-              <dt>Shipping</dt>
-              <dd>{order.customer.shipMethod ?? "—"}</dd>
-            </dl>
-          )}
+          {contactOpen && <ContactDetails order={order} onOrder={(o) => { setOrder(o); onChange(); }} />}
         </div>
         <div className="stack">
           <h3 className="section-label">Timeline</h3>
@@ -790,6 +787,167 @@ export function OrderPanel({ orderId, me, onChange }: { orderId: number; me: Me;
 
       {anyApproved && order.stage !== "cancelled" && <HandOff order={order} me={me} reload={reload} onChange={onChange} />}
     </section>
+  );
+}
+
+/** Extra people who get a view-only copy of each proof. Only the main customer approves. */
+function Viewers({ order, onOrder }: { order: OrderDetail; onOrder: (o: OrderDetail) => void }) {
+  const [adding, setAdding] = useState(false);
+  const [email, setEmail] = useState("");
+  const proofWaiting = order.proofs.some((p) => p.status === "open");
+  const [sendNow, setSendNow] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const add = async () => {
+    setError(null);
+    try {
+      const r = await api<{ order: OrderDetail }>("POST", `/orders/${order.id}/viewers`, { email, sendNow: proofWaiting && sendNow });
+      onOrder(r.order);
+      setEmail("");
+      setAdding(false);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Couldn't add them");
+    }
+  };
+  const remove = async (id: number) => {
+    setError(null);
+    try {
+      onOrder(await api<OrderDetail>("DELETE", `/orders/${order.id}/viewers/${id}`));
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Couldn't remove them");
+    }
+  };
+  return (
+    <div className="stack" style={{ gap: 6 }}>
+      <span className="field__label">Also gets proof copies (view only)</span>
+      {order.viewers.length === 0 && !adding && <span className="small muted">Nobody else. Only {order.customer.name ?? "the customer"} gets proofs.</span>}
+      {order.viewers.map((v) => (
+        <div key={v.id} className="row" style={{ justifyContent: "space-between" }}>
+          <span>
+            {v.email} <span className="small muted">· added by {v.addedBy ?? "—"}</span>
+          </span>
+          <button type="button" className="btn btn--link" style={{ minHeight: 32 }} onClick={() => remove(v.id)}>
+            Remove
+          </button>
+        </div>
+      ))}
+      {adding ? (
+        <div className="form-box" style={{ marginTop: 0 }}>
+          <div className="field">
+            <label htmlFor="viewer-email">Their email</label>
+            <input id="viewer-email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. owner@hansonexcavating.com" />
+          </div>
+          {proofWaiting && (
+            <label className="check">
+              <input type="checkbox" checked={sendNow} onChange={(e) => setSendNow(e.target.checked)} />
+              Send them the waiting proof now
+            </label>
+          )}
+          <span className="small muted">They see each proof and its status but can't approve, ask for changes or see your messages with the customer.</span>
+          <ErrorNote error={error} />
+          <div className="row">
+            <button type="button" className="btn btn--dark" disabled={!email.trim()} onClick={add}>
+              Add
+            </button>
+            <button type="button" className="btn btn--link" onClick={() => setAdding(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <ErrorNote error={error} />
+          <button type="button" className="btn" style={{ alignSelf: "flex-start" }} onClick={() => setAdding(true)}>
+            Add someone
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Contact and shipping, with a way to fix a mistyped email or phone. */
+function ContactDetails({ order, onOrder }: { order: OrderDetail; onOrder: (o: OrderDetail) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [email, setEmail] = useState(order.customer.email ?? "");
+  const [phone, setPhone] = useState(order.customer.phone ?? "");
+  const proofWaiting = order.proofs.some((p) => p.status === "open");
+  const [resend, setResend] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const save = async () => {
+    setError(null);
+    try {
+      const r = await api<{ resent: boolean; order: OrderDetail }>("PATCH", `/orders/${order.id}/contact`, { email, phone, resendProof: proofWaiting && resend });
+      onOrder(r.order);
+      setEditing(false);
+      setNote(r.resent ? `Saved. The proof was emailed to ${r.order.customer.email}.` : "Saved.");
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Couldn't save");
+    }
+  };
+  if (editing) {
+    return (
+      <div className="form-box" style={{ marginTop: 0 }}>
+        <div className="form-grid">
+          <div className="field">
+            <label htmlFor="c-email">Customer email</label>
+            <input id="c-email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="c-phone">Phone</label>
+            <input id="c-phone" className="input" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          </div>
+        </div>
+        {proofWaiting && email.trim() !== (order.customer.email ?? "") && (
+          <label className="check">
+            <input type="checkbox" checked={resend} onChange={(e) => setResend(e.target.checked)} />
+            Email the waiting proof to the new address
+          </label>
+        )}
+        <span className="small muted">
+          Changes here are used for proof emails. If the email was wrong in Shopify too, fix it there as well so shipping emails reach the customer.
+        </span>
+        <ErrorNote error={error} />
+        <div className="row">
+          <button type="button" className="btn btn--dark" disabled={!email.trim()} onClick={save}>
+            Save
+          </button>
+          <button type="button" className="btn btn--link" onClick={() => setEditing(false)}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="stack" style={{ gap: 6 }}>
+      <dl className="dl">
+        <dt>Email</dt>
+        <dd>{order.customer.email ?? "—"}</dd>
+        <dt>Phone</dt>
+        <dd>{order.customer.phone ?? "—"}</dd>
+        <dt>Ship to</dt>
+        <dd>{order.customer.shipTo ?? "—"}</dd>
+        <dt>Shipping</dt>
+        <dd>{order.customer.shipMethod ?? "—"}</dd>
+      </dl>
+      <Viewers order={order} onOrder={onOrder} />
+      <div className="row">
+        <button
+          type="button"
+          className="btn"
+          onClick={() => {
+            setEmail(order.customer.email ?? "");
+            setPhone(order.customer.phone ?? "");
+            setNote(null);
+            setEditing(true);
+          }}
+        >
+          Edit email or phone
+        </button>
+        {note && <span className="small" style={{ color: "var(--success)", fontWeight: 600 }}>{note}</span>}
+      </div>
+    </div>
   );
 }
 

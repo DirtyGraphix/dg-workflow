@@ -84,11 +84,104 @@ export async function ensureProofToken(db: D1Database, order: OrderRow): Promise
   return row!.proof_token;
 }
 
+/** The customer's own link. Only this link can approve, ask for changes or send messages. */
 export async function orderByToken(db: D1Database, token: string): Promise<OrderRow> {
   if (!/^[A-Za-z0-9_-]{20,}$/.test(token)) throw new WorkflowError("This link isn't valid", 404);
   const o = await db.prepare("SELECT * FROM orders WHERE proof_token = ?").bind(token).first<OrderRow>();
   if (!o) throw new WorkflowError("This link isn't valid", 404);
   return o;
+}
+
+/** The customer's link, or an extra person's view-only link. */
+export async function orderForViewing(db: D1Database, token: string): Promise<{ order: OrderRow; viewOnly: boolean }> {
+  if (!/^[A-Za-z0-9_-]{20,}$/.test(token)) throw new WorkflowError("This link isn't valid", 404);
+  const o = await db.prepare("SELECT * FROM orders WHERE proof_token = ?").bind(token).first<OrderRow>();
+  if (o) return { order: o, viewOnly: false };
+  const v = await db
+    .prepare("SELECT o.* FROM order_contacts c JOIN orders o ON o.id = c.order_id WHERE c.token = ? AND c.removed_at IS NULL")
+    .bind(token)
+    .first<OrderRow>();
+  if (!v) throw new WorkflowError("This link isn't valid", 404);
+  return { order: v, viewOnly: true };
+}
+
+// ---------- extra people (view only) ----------
+
+export interface OrderContactRow {
+  id: number;
+  order_id: number;
+  email: string;
+  token: string;
+  added_by: number | null;
+  added_at: string;
+  removed_at: string | null;
+}
+
+export async function contactsFor(db: D1Database, orderId: number) {
+  const { results } = await db
+    .prepare("SELECT c.id, c.email, c.added_at AS addedAt, p.name AS addedBy FROM order_contacts c LEFT JOIN people p ON p.id = c.added_by WHERE c.order_id = ? AND c.removed_at IS NULL ORDER BY c.id")
+    .bind(orderId)
+    .all<{ id: number; email: string; addedAt: string; addedBy: string | null }>();
+  return results;
+}
+
+/** Sends the view-only copy to every extra person on the order. */
+async function emailViewers(env: Env, order: OrderRow, machineNames: string[], opts: { origin: string; sentBy?: number | null; only?: number }) {
+  const { results } = await env.DB
+    .prepare("SELECT * FROM order_contacts WHERE order_id = ? AND removed_at IS NULL")
+    .bind(order.id)
+    .all<OrderContactRow>();
+  const settings = await getSettings(env.DB);
+  const designer = ((await personName(env.DB, order.assigned_to)) ?? "Our design team").split(" ")[0];
+  let sent = 0;
+  for (const c of results.filter((x) => !opts.only || x.id === opts.only)) {
+    const ok = await queueEmail(env.DB, settings, {
+      orderId: order.id,
+      to: c.email,
+      kind: "viewer_copy",
+      url: proofLink(settings, opts.origin, c.token),
+      sentBy: opts.sentBy,
+      vars: {
+        first_name: "there",
+        customer_name: order.customer_name?.trim() || "The customer",
+        order_number: order.order_number,
+        designer,
+        machines: machineList(machineNames),
+      },
+    });
+    if (ok) sent++;
+  }
+  return sent;
+}
+
+/** Adds someone who gets a view-only copy of each proof. Optionally sends them the waiting proof now. */
+export async function addViewer(env: Env, orderId: number, by: Person, input: { email: string; sendNow?: boolean; origin: string }) {
+  const order = await getOrder(env.DB, orderId);
+  const email = (input.email ?? "").trim();
+  if (!EMAIL_PATTERN.test(email)) throw new WorkflowError("That email address doesn't look right");
+  if (email.toLowerCase() === (order.customer_email ?? "").toLowerCase()) throw new WorkflowError("That's already the main customer's email");
+  const existing = await contactsFor(env.DB, orderId);
+  if (existing.some((c) => c.email.toLowerCase() === email.toLowerCase())) throw new WorkflowError("That person is already on this order");
+  if (existing.length >= 5) throw new WorkflowError("An order can have up to 5 extra people");
+  const row = await env.DB
+    .prepare("INSERT INTO order_contacts (order_id, email, token, added_by) VALUES (?, ?, ?, ?) RETURNING id")
+    .bind(orderId, email, newToken(), by.id)
+    .first<{ id: number }>();
+  await addEvent(env.DB, { orderId, kind: "viewer_added", personId: by.id, data: { email } }).run();
+  if (!input.sendNow) return { sent: false };
+  const machines = await openProofMachines(env.DB, orderId);
+  if (!machines.length) return { sent: false };
+  return { sent: (await emailViewers(env, order, machines, { origin: input.origin, sentBy: by.id, only: row!.id })) > 0 };
+}
+
+/** Removes an extra person. Their link stops working. */
+export async function removeViewer(env: Env, orderId: number, contactId: number, by: Person) {
+  const c = await env.DB.prepare("SELECT * FROM order_contacts WHERE id = ? AND order_id = ? AND removed_at IS NULL").bind(contactId, orderId).first<OrderContactRow>();
+  if (!c) throw new WorkflowError("That person isn't on this order", 404);
+  await env.DB.batch([
+    env.DB.prepare("UPDATE order_contacts SET removed_at = ? WHERE id = ?").bind(now(), contactId),
+    addEvent(env.DB, { orderId, kind: "viewer_removed", personId: by.id, data: { email: c.email } }),
+  ]);
 }
 
 // ---------- reads ----------
@@ -306,6 +399,7 @@ export async function sendProof(
   await db.batch(stmts);
   await settleStage(db, orderId);
   await emailCustomer(env, order, number === 1 ? "proof_ready" : "revision_ready", targets.map((m) => m.machine), { origin: input.origin, sentBy: by.id });
+  await emailViewers(env, order, targets.map((m) => m.machine), { origin: input.origin, sentBy: by.id });
   return proofId;
 }
 
@@ -352,6 +446,49 @@ async function openProofMachines(db: D1Database, orderId: number): Promise<strin
   return results.map((r) => r.machine);
 }
 
+export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/**
+ * Corrects the customer's email or phone on the order (a typo, or a different person handling the order).
+ * Logged with who changed it and the old and new value. Optionally emails any waiting proof to the new address.
+ */
+export async function updateContact(
+  env: Env,
+  orderId: number,
+  by: Person,
+  input: { email?: string; phone?: string; resendProof?: boolean; origin: string },
+): Promise<{ resent: boolean }> {
+  const order = await getOrder(env.DB, orderId);
+  const stmts: D1PreparedStatement[] = [];
+  const changes: { field: string; from: string | null; to: string | null }[] = [];
+  if (input.email !== undefined) {
+    const email = input.email.trim();
+    if (!EMAIL_PATTERN.test(email)) throw new WorkflowError("That email address doesn't look right");
+    if (email !== order.customer_email) changes.push({ field: "email", from: order.customer_email, to: email });
+  }
+  if (input.phone !== undefined) {
+    const phone = input.phone.trim() || null;
+    if (phone !== order.customer_phone) changes.push({ field: "phone", from: order.customer_phone, to: phone });
+  }
+  for (const c of changes) {
+    stmts.push(
+      env.DB.prepare(`UPDATE orders SET ${c.field === "email" ? "customer_email" : "customer_phone"} = ? WHERE id = ?`).bind(c.to, orderId),
+      addEvent(env.DB, { orderId, kind: "contact_changed", personId: by.id, data: c }),
+    );
+  }
+  if (stmts.length) await env.DB.batch(stmts);
+  const emailChanged = changes.some((c) => c.field === "email");
+  if (!emailChanged || !input.resendProof) return { resent: false };
+  // Send the waiting proof to the corrected address, as a proof-ready or revision-ready email.
+  const machines = await openProofMachines(env.DB, orderId);
+  if (!machines.length) return { resent: false };
+  const latest = await env.DB.prepare("SELECT MAX(number) AS n FROM proofs WHERE order_id = ? AND status = 'open'").bind(orderId).first<{ n: number }>();
+  const updated = await getOrder(env.DB, orderId);
+  const resent = await emailCustomer(env, updated, (latest?.n ?? 1) > 1 ? "revision_ready" : "proof_ready", machines, { origin: input.origin, sentBy: by.id });
+  if (resent) await addEvent(env.DB, { orderId, kind: "proof_resent", personId: by.id, data: { to: updated.customer_email } }).run();
+  return { resent };
+}
+
 /** A reminder sent by hand from the order. Logged with who sent it. */
 export async function sendReminder(env: Env, orderId: number, by: Person, origin: string) {
   const order = await getOrder(env.DB, orderId);
@@ -392,6 +529,9 @@ export interface CustomerView {
   designer: string;
   stage: Stage;
   closed: boolean;
+  /** An extra person's link: they can look but not approve, ask for changes or message. */
+  viewOnly: boolean;
+  customerFirstName: string;
   proofs: CustomerProof[];
   history: CustomerProof[];
   messages: { author: "customer" | "staff"; name: string; body: string; at: string; files: { id: number; filename: string }[] }[];
@@ -403,7 +543,7 @@ const proofLabel = (n: number) => (n <= 1 ? "First proof" : `Revision ${n - 1}`)
 /** Everything the customer sees. Machine names, finishes and the designer's notes; never prices or internal notes. */
 export async function customerView(env: Env, token: string, opts: { trackView: boolean }): Promise<CustomerView> {
   const db = env.DB;
-  const order = await orderByToken(db, token);
+  const { order, viewOnly } = await orderForViewing(db, token);
   const settings = await getSettings(db);
   const machines = await getMachines(db, order.id);
   const proofs = await proofsFor(db, order.id);
@@ -453,7 +593,8 @@ export async function customerView(env: Env, token: string, opts: { trackView: b
       ? proofs.filter((p) => !current.has(p.id) && p.status !== "withdrawn").reverse().map(toView)
       : [];
 
-  if (opts.trackView) {
+  // Only the main customer opening a proof counts as "viewed".
+  if (opts.trackView && !viewOnly) {
     const open = shown.filter((p) => p.status === "open").map((p) => p.id);
     if (open.length) {
       const at = now();
@@ -471,9 +612,12 @@ export async function customerView(env: Env, token: string, opts: { trackView: b
     designer,
     stage: order.stage,
     closed,
-    proofs: shown.map(toView),
+    viewOnly,
+    customerFirstName: firstName(order.customer_name),
+    proofs: shown.map((p) => ({ ...toView(p), canUndo: !viewOnly && toView(p).canUndo })),
     history,
-    messages: messages.map((m) => ({
+    // The conversation stays between the customer and their designer.
+    messages: viewOnly ? [] : messages.map((m) => ({
       author: m.author,
       name: m.author === "customer" ? "You" : first(m.person_id) ?? "Dirty Graphix",
       body: m.body,
@@ -600,10 +744,11 @@ export async function customerMessage(env: Env, token: string, input: { body: st
 // ---------- files out ----------
 
 export async function fileForCustomer(env: Env, token: string, fileId: number) {
-  const order = await orderByToken(env.DB, token);
+  const { order, viewOnly } = await orderForViewing(env.DB, token);
   const f = await env.DB.prepare("SELECT * FROM files WHERE id = ? AND order_id = ?").bind(fileId, order.id).first<FileRow>();
   if (!f) throw new WorkflowError("File not found", 404);
-  // Customers only see files on proofs they can see, and their own messages' files.
+  // Customers only see files on proofs they can see, and their own messages' files. Extra people see proof files only.
+  if (viewOnly && !f.proof_id) throw new WorkflowError("File not found", 404);
   if (f.proof_id) {
     const p = await env.DB.prepare("SELECT status FROM proofs WHERE id = ?").bind(f.proof_id).first<{ status: string }>();
     if (!p || p.status === "withdrawn") throw new WorkflowError("File not found", 404);

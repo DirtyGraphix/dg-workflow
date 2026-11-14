@@ -118,7 +118,8 @@ describe("an order from intake to hand-off", () => {
   it("never sends a price to design", async () => {
     const d = await alissa.req("GET", `/api/orders/${orderId}`);
     expect(d.status).toBe(200);
-    const text = JSON.stringify(d.json);
+    // Timestamps are taken out first: "…:20.312Z" would otherwise look like the 0.31 price.
+    const text = JSON.stringify(d.json).replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z/g, "<time>");
     for (const amount of ["3890", "3850", "1999", "1499", "69.95", "0.31", "$"]) expect(text).not.toContain(amount);
     expect(text).not.toMatch(/price/i);
     expect(d.json.paymentStatus).toBe("paid");
@@ -601,5 +602,92 @@ describe("the Resend connection", () => {
     } finally {
       globalThis.fetch = realFetch;
     }
+  });
+});
+
+describe("fixing the customer's email", () => {
+  it("lets the order's designer correct it, logs the change and emails the waiting proof to the new address", async () => {
+    await sendWebhook("orders/create", sampleShopifyOrder({ id: 5550030, name: "514860030", email: "rick@exmaple.com" }));
+    const id = (await cierra.req("GET", "/api/assign")).json.unassigned.find((u: Json) => u.order.orderNumber === "514860030").order.id;
+    await cierra.req("POST", `/api/orders/${id}/assign`, { personId: alissaId });
+    const ms = (await alissa.req("GET", `/api/orders/${id}`)).json.machines.map((m: Json) => m.id);
+    await sendProofAs(alissa, id, ms, "");
+    expect((await andrew.req("PATCH", `/api/orders/${id}/contact`, { email: "rick@example.com" })).status).toBe(403);
+    expect((await alissa.req("PATCH", `/api/orders/${id}/contact`, { email: "rick@" })).status).toBe(400);
+    const r = await alissa.req("PATCH", `/api/orders/${id}/contact`, { email: "rick@example.com", resendProof: true });
+    expect(r.status).toBe(200);
+    expect(r.json.resent).toBe(true);
+    expect(r.json.order.customer.email).toBe("rick@example.com");
+    const kinds = r.json.order.timeline.map((e: Json) => e.kind);
+    expect(kinds).toEqual(expect.arrayContaining(["contact_changed", "proof_resent"]));
+    expect(r.json.order.timeline.find((e: Json) => e.kind === "contact_changed").data).toMatchObject({ field: "email", from: "rick@exmaple.com", to: "rick@example.com" });
+    const sent = await env.DB.prepare("SELECT to_email FROM outbox WHERE order_id = ? ORDER BY id").bind(id).all<{ to_email: string }>();
+    expect(sent.results.map((x) => x.to_email)).toEqual(["rick@exmaple.com", "rick@example.com"]);
+  });
+
+  it("picks up an email corrected in Shopify", async () => {
+    const o = sampleShopifyOrder({ id: 5550030, name: "514860030", email: "rick.hanson@example.com" });
+    await sendWebhook("orders/updated", o);
+    const row = await env.DB.prepare("SELECT customer_email FROM orders WHERE shopify_order_id = '5550030'").first<{ customer_email: string }>();
+    expect(row!.customer_email).toBe("rick.hanson@example.com");
+  });
+});
+
+describe("extra people on an order (view only)", () => {
+  let id = 0;
+  let viewerLink = "";
+  let customerLink = "";
+  let proofId = 0;
+
+  it("sends them their own view-only link with each proof", async () => {
+    await sendWebhook("orders/create", sampleShopifyOrder({ id: 5550040, name: "514860040" }));
+    id = (await cierra.req("GET", "/api/assign")).json.unassigned.find((u: Json) => u.order.orderNumber === "514860040").order.id;
+    await cierra.req("POST", `/api/orders/${id}/assign`, { personId: alissaId });
+    expect((await alissa.req("POST", `/api/orders/${id}/viewers`, { email: "rick@example.com" })).status).toBe(400); // main customer
+    expect((await andrew.req("POST", `/api/orders/${id}/viewers`, { email: "owner@example.com" })).status).toBe(403);
+    const added = await alissa.req("POST", `/api/orders/${id}/viewers`, { email: "owner@example.com" });
+    expect(added.status).toBe(201);
+    expect(added.json.order.viewers.map((v: Json) => v.email)).toEqual(["owner@example.com"]);
+    expect((await alissa.req("POST", `/api/orders/${id}/viewers`, { email: "OWNER@example.com" })).status).toBe(400); // duplicate
+
+    const ms = (await alissa.req("GET", `/api/orders/${id}`)).json.machines.map((m: Json) => m.id);
+    const sent = await sendProofAs(alissa, id, ms, "Here's your first mockup");
+    customerLink = sent.json.customerLink;
+    proofId = sent.json.proofs[0].id;
+    const emails = (await env.DB.prepare("SELECT kind, to_email, payload_json FROM outbox WHERE order_id = ? ORDER BY id").bind(id).all<Json>()).results;
+    expect(emails.map((e) => [e.kind, e.to_email])).toEqual([
+      ["proof_ready", "rick@example.com"],
+      ["viewer_copy", "owner@example.com"],
+    ]);
+    const copy = JSON.parse(emails[1].payload_json);
+    expect(copy.body).toContain("Rick Hanson asked us to send you a copy");
+    viewerLink = copy.button_url;
+    expect(viewerLink).not.toBe(customerLink);
+  });
+
+  it("shows the proof without approve, changes or messages, and doesn't count as the customer viewing", async () => {
+    const page = await (await customerGet(new URL(viewerLink).pathname)).text();
+    expect(page).toContain("You&#39;re viewing a copy. Rick approves the design");
+    expect(page).not.toContain("/approve");
+    expect(page).not.toContain("/changes");
+    expect(page).not.toContain("/message");
+    expect(page).not.toContain("Here&#39;s your first mockup".replace("Here", "zzz")); // note from designer still shows
+    expect(page).toContain("Here&#39;s your first mockup");
+    const d = await alissa.req("GET", `/api/orders/${id}`);
+    expect(d.json.proofs[0].viewedAt).toBeNull();
+    const file = d.json.proofs[0].files[0].id;
+    expect((await customerGet(`${new URL(viewerLink).pathname}/file/${file}`)).status).toBe(200);
+    // Their link can't act, even if someone builds the form by hand.
+    expect((await customerPost(`${new URL(viewerLink).pathname}/approve`, { proof: String(proofId) })).status).toBe(404);
+    expect((await alissa.req("GET", `/api/orders/${id}`)).json.stage).toBe("proof_sent");
+  });
+
+  it("stops their link working when they're removed", async () => {
+    const d = await alissa.req("GET", `/api/orders/${id}`);
+    const r = await alissa.req("DELETE", `/api/orders/${id}/viewers/${d.json.viewers[0].id}`);
+    expect(r.json.viewers).toEqual([]);
+    expect(r.json.timeline.map((e: Json) => e.kind)).toEqual(expect.arrayContaining(["viewer_added", "viewer_removed"]));
+    expect((await customerGet(new URL(viewerLink).pathname)).status).toBe(404);
+    expect((await customerGet(new URL(customerLink).pathname)).status).toBe(200);
   });
 });

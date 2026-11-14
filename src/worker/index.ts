@@ -51,6 +51,10 @@ import {
   fileForCustomer,
   fileResponse,
   markRead,
+  updateContact,
+  addViewer,
+  removeViewer,
+  contactsFor,
   proofLink,
   proofsForStaff,
   runReminders,
@@ -373,6 +377,7 @@ async function fullOrder(c: Context<AppEnv>, id = idParam(c)) {
   return {
     ...detail,
     ...proofs,
+    viewers: await contactsFor(c.env.DB, id),
     customerUnread: !!row?.customer_unread,
     customerLink: row?.proof_token ? proofLink(settings, origin(c), row.proof_token) : null,
   };
@@ -419,6 +424,30 @@ api.post("/orders/:id/reminder", async (c) => {
   await loadForWork(c);
   await sendReminder(c.env, idParam(c), c.get("person"), origin(c));
   deliverLater(c);
+  return c.json(await fullOrder(c));
+});
+
+// Fix the customer's email or phone. The order's designer, the team lead, Nikki and TY can do this.
+api.patch("/orders/:id/contact", async (c) => {
+  await loadForWork(c);
+  const b = await c.req.json<{ email?: string; phone?: string; resendProof?: boolean }>();
+  const result = await updateContact(c.env, idParam(c), c.get("person"), { ...b, origin: origin(c) });
+  deliverLater(c);
+  return c.json({ ...result, order: await fullOrder(c) });
+});
+
+// Extra people who get a view-only copy of each proof.
+api.post("/orders/:id/viewers", async (c) => {
+  await loadForWork(c);
+  const b = await c.req.json<{ email: string; sendNow?: boolean }>();
+  const result = await addViewer(c.env, idParam(c), c.get("person"), { ...b, origin: origin(c) });
+  deliverLater(c);
+  return c.json({ ...result, order: await fullOrder(c) }, 201);
+});
+
+api.delete("/orders/:id/viewers/:viewerId", async (c) => {
+  await loadForWork(c);
+  await removeViewer(c.env, idParam(c), Number(c.req.param("viewerId")), c.get("person"));
   return c.json(await fullOrder(c));
 });
 
