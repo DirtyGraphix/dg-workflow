@@ -133,6 +133,10 @@ a:hover { color: var(--link-hover); }
 .msg__body { margin: 4px 0 0; font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .customer-ask { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid var(--brand-tint-border); border-left: 6px solid var(--stage-revision); border-radius: var(--radius-card); background: var(--brand-tint); }
 
+/* ---------- rush alert (repeats until acknowledged) ---------- */
+.rush-alert { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 16px; border: 2px solid var(--stage-rush); border-left-width: 8px; border-radius: var(--radius-card); background: var(--brand-tint); font-size: 16px; }
+.rush-alert .btn { margin-left: auto; }
+
 /* ---------- settings ---------- */
 .settings { display: flex; flex-direction: column; gap: var(--gap); max-width: 980px; width: 100%; margin: 0 auto; }
 .settings-card { padding: 0; gap: 0; overflow: hidden; }

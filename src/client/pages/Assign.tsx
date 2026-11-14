@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useLiveRefresh } from "../live";
 import { api, ApiError, type AssignBoard, type Me, type Workload } from "../api";
 import { Shell } from "../components/Shell";
 import { Chip, ErrorNote, OrderTags } from "../components/ui";
@@ -60,6 +61,8 @@ export function Assign({ me }: { me: Me }) {
       setError(e instanceof ApiError ? e.message : "Couldn't load orders");
     }
   }, []);
+  useLiveRefresh(() => load());
+
   useEffect(() => {
     load();
   }, [load]);

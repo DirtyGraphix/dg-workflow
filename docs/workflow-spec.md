@@ -254,6 +254,7 @@ Design and production work from separate views, and each side gets a paper ticke
 | Reorder alert or equipment pause | Production screen | Low tone |
 
 - A designer's sounds play only for their own orders. Only rush and reprint repeat.
+- Built Nov 14, 2026 for the design queue: the queue, open order and assignment board refresh on their own every 20 seconds (paused while the tab is in the background). Sounds: soft chime (assigned), two-tone (revision requested), done tone (customer approved), rush alert repeating every 10 seconds with an Acknowledge banner. A header button cycles Sound: On / Low / Off and is remembered per computer. Sounds never play for the designer's own actions or when viewing someone else's queue. Production and TV sounds come with Phases 3 and 4.
 - Each screen has volume and mute controls, and sounds play only during business hours.
 - Browsers need one click on the page before they'll play sound. A kiosk-mode mini PC on the TVs can skip that.
 
