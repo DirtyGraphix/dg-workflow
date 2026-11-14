@@ -1,6 +1,7 @@
 // Customer emails. Every email is queued in the outbox first, so nothing is lost and TY can see what went out.
-// Cloudflare Email Service sends them straight from the app, in one branded layout built here.
-// Nothing is sent until TY turns on sending in Proof settings (after the domain is set up in Cloudflare).
+// Resend sends them, in one branded layout built here. (dirtygraphix.com's DNS is at Wix, and Cloudflare's
+// email service only works for domains on Cloudflare DNS.) Nothing is sent until the RESEND_API_KEY secret
+// is set and TY turns on sending in Proof settings.
 
 import type { Env } from "../env";
 import tokensCss from "../../../design/tokens.css";
@@ -176,16 +177,63 @@ export function senderFrom(settings: Record<string, string>) {
   return { name: settings.email_from_name?.trim() || "Dirty Graphix", email };
 }
 
+export interface OutgoingEmail {
+  from: { name: string; email: string };
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  replyTo?: string;
+  /** The same key is never sent twice, even if a retry happens after a timeout. */
+  idempotencyKey?: string;
+}
+export type Mailer = (m: OutgoingEmail) => Promise<void>;
+
+/** Sends one email through Resend's API. */
+export function resendMailer(apiKey: string | undefined): Mailer | null {
+  if (!apiKey) return null;
+  return async (m) => {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json",
+        ...(m.idempotencyKey ? { "idempotency-key": m.idempotencyKey } : {}),
+      },
+      body: JSON.stringify({
+        from: `${m.from.name.replace(/[<>"]/g, "")} <${m.from.email}>`,
+        to: [m.to],
+        subject: m.subject,
+        html: m.html,
+        text: m.text,
+        ...(m.replyTo ? { reply_to: m.replyTo } : {}),
+      }),
+    });
+    if (!res.ok) {
+      let detail = "";
+      try {
+        const body = (await res.json()) as { message?: string; error?: { message?: string } };
+        detail = body.message ?? body.error?.message ?? "";
+      } catch {}
+      throw new Error(`Resend ${res.status}${detail ? `: ${detail}` : ""}`);
+    }
+  };
+}
+
 /**
- * Sends waiting emails through Cloudflare Email Service. Does nothing while sending is turned off.
+ * Sends waiting emails. Does nothing while sending is turned off or Resend isn't connected.
  * A failed email is retried on later runs, up to 5 tries.
  */
-export async function deliverOutbox(env: Pick<Env, "DB" | "EMAIL">, limit = 25): Promise<{ sent: number; failed: number; on: boolean }> {
+export async function deliverOutbox(
+  env: Pick<Env, "DB" | "RESEND_API_KEY">,
+  limit = 25,
+  mailer: Mailer | null = resendMailer(env.RESEND_API_KEY),
+): Promise<{ sent: number; failed: number; on: boolean }> {
   const settings = Object.fromEntries(
     (await env.DB.prepare("SELECT key, value FROM settings WHERE key LIKE 'email_%'").all<{ key: string; value: string }>()).results.map((r) => [r.key, r.value]),
   );
   const from = senderFrom(settings);
-  if (settings.email_sending !== "1" || !from || !env.EMAIL) return { sent: 0, failed: 0, on: false };
+  if (settings.email_sending !== "1" || !from || !mailer) return { sent: 0, failed: 0, on: false };
   const { results } = await env.DB
     .prepare("SELECT id, to_email, payload_json FROM outbox WHERE status = 'pending' AND attempts < 5 ORDER BY id LIMIT ?")
     .bind(limit)
@@ -196,13 +244,14 @@ export async function deliverOutbox(env: Pick<Env, "DB" | "EMAIL">, limit = 25):
     const payload = JSON.parse(row.payload_json) as EmailPayload;
     const { html, text } = renderEmail(payload);
     try {
-      await env.EMAIL.send({
+      await mailer({
         from,
         to: row.to_email,
         subject: payload.subject,
         html,
         text,
-        ...(settings.email_reply_to?.trim() ? { replyTo: settings.email_reply_to.trim() } : {}),
+        replyTo: settings.email_reply_to?.trim() || undefined,
+        idempotencyKey: `dgw-outbox-${row.id}`,
       });
       sent++;
       await env.DB.prepare("UPDATE outbox SET status = 'sent', sent_at = ?, attempts = attempts + 1, error = NULL WHERE id = ?").bind(new Date().toISOString(), row.id).run();

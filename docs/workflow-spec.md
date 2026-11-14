@@ -15,7 +15,7 @@ Everything runs through Shopify plus one custom app, keeping outside apps to a m
 
 - **One custom web app connected to Shopify:** the design view, production screen, roll planner, checklists and reports. Everyone signs in with the app's own logins, not Shopify staff accounts. The store is on the Grow plan, which has 5 staff seats, so this keeps the seats free and lets people be added without upgrading. Native B2B is Plus-only, but dealers already run through the dealer-b2b Market, which works on Grow.
 - **Shopify stays the source of truth:** orders, customers, rush add-ons, shipping labels and fulfillment. A new order creates a job automatically, and marking the order fulfilled closes the job and sends Shopify's shipping email.
-- **Cloudflare Email Service** sends the branded workflow emails straight from the app (switched from Klaviyo on Nov 14, 2026, so wording and look live in one place).
+- **Resend** sends the branded workflow emails from no_reply@dirtygraphix.com, with wording and look managed in the app (decided Nov 14, 2026: not Klaviyo, so everything lives in one place; not Cloudflare Email Service, because dirtygraphix.com's DNS stays at Wix).
 - **Shopify Flow, built in,** handles small automations such as tagging rush orders.
 
 **What counts as a design job**
@@ -261,7 +261,7 @@ Two emails cover the gap between approval and shipping. Shopify's existing shipp
 
 **Everything stays in the system.** All customer emails send from the no-reply address. A reply gets an automatic kickback pointing the customer to their order page. Each email links to that page, where the customer can approve, request changes, upload files, answer a question or send a message. Every response lands on the order's timeline, the designer is notified, and nothing lives in a personal inbox.
 
-**Proof emails (replacing Approve Pro's emails):** Proof ready (with the proof link), Revision ready, Reminders while a proof waits (automatic on a schedule to be set, or sent by hand from the order), and Approved (a thank-you confirmation). All of them, plus the two below, go out through Cloudflare Email Service on one branded layout.
+**Proof emails (replacing Approve Pro's emails):** Proof ready (with the proof link), Revision ready, Reminders while a proof waits (automatic on a schedule to be set, or sent by hand from the order), and Approved (a thank-you confirmation). All of them, plus the two below, go out through Resend on one branded layout.
 
 **1. In the production queue** (sent at hand-off)
 

@@ -13,8 +13,8 @@ declare global {
       SHOPIFY_WEBHOOK_SECRET: string;
       /** Secret: one-time token for creating the first admin login. */
       SETUP_TOKEN?: string;
-      /** Cloudflare Email Service: sends customer emails (proofs, reminders, replies). */
-      EMAIL: SendEmail;
+      /** Secret: Resend API key (sending access only). Customer emails wait in the outbox until it's set. */
+      RESEND_API_KEY?: string;
     }
   }
 }

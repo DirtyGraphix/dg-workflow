@@ -41,7 +41,7 @@ import {
   getSettings,
   type OrderRow,
 } from "./lib/orders";
-import { deliverOutbox, EMAIL_KINDS, EMAIL_LABELS, fill, renderEmail, senderFrom, type EmailKind, type EmailPayload } from "./lib/email";
+import { deliverOutbox, EMAIL_KINDS, EMAIL_LABELS, fill, renderEmail, resendMailer, senderFrom, type EmailKind, type EmailPayload } from "./lib/email";
 import {
   customerApprove,
   customerMessage,
@@ -526,7 +526,8 @@ api.get("/proof-settings", async (c) => {
   return c.json({
     settings: Object.fromEntries(Object.entries(all).filter(([k]) => isProofSetting(k))),
     emails: EMAIL_KINDS.map((k) => ({ kind: k, ...EMAIL_LABELS[k] })),
-    sendingOn: all.email_sending === "1" && !!senderFrom(all),
+    sendingOn: all.email_sending === "1" && !!senderFrom(all) && !!c.env.RESEND_API_KEY,
+    resendConnected: !!c.env.RESEND_API_KEY,
     appOrigin: c.env.APP_ORIGIN ?? null,
     outbox: outbox.map(({ payload_json, ...r }) => ({ ...r, subject: JSON.parse(payload_json).subject as string })),
   });
@@ -583,12 +584,14 @@ api.post("/proof-settings/test-email", async (c) => {
   const settings = await getSettings(c.env.DB);
   const from = senderFrom(settings);
   if (!from) return c.json({ error: "Add a sender address first" }, 400);
+  const mailer = resendMailer(c.env.RESEND_API_KEY);
+  if (!mailer) return c.json({ error: "Resend isn't connected yet. Add the RESEND_API_KEY secret in Cloudflare first." }, 409);
   const p = samplePayload("proof_ready", JSON.parse(settings.email_proof_ready), `${origin(c)}/proof/sample`);
   const { html, text } = renderEmail(p);
   try {
-    await c.env.EMAIL.send({ from, to: me.email, subject: `[Test] ${p.subject}`, html, text });
+    await mailer({ from, to: me.email, subject: `[Test] ${p.subject}`, html, text });
   } catch (e) {
-    return c.json({ error: `Cloudflare didn't send it: ${e instanceof Error ? e.message : String(e)}` }, 502);
+    return c.json({ error: `The email didn't send: ${e instanceof Error ? e.message : String(e)}` }, 502);
   }
   return c.json({ ok: true, to: me.email });
 });

@@ -19,6 +19,7 @@ interface SettingsResponse {
   settings: Settings;
   emails: { kind: string; name: string; when: string }[];
   sendingOn: boolean;
+  resendConnected: boolean;
   appOrigin: string | null;
   outbox: { id: number; kind: string; toEmail: string; status: string; createdAt: string; sentAt: string | null; error: string | null; orderNumber: string | null; sentBy: string | null; subject: string }[];
 }
@@ -331,7 +332,7 @@ export function ProofSettings({ me }: { me: Me }) {
 
         <Card
           title="Email sending"
-          intro="Customer emails send from this app through Cloudflare."
+          intro="Customer emails send from this app through Resend."
           onSave={save("sending", ["email_sending", "email_from_name", "email_from_address", "email_reply_to", "email_bcc"])}
           status={
             <>
@@ -346,12 +347,14 @@ export function ProofSettings({ me }: { me: Me }) {
           <div className={`notice${data.sendingOn ? "" : " notice--warn"}`}>
             {data.sendingOn
               ? "Sending is on. Emails go out within a minute."
-              : "Sending is off, so emails are saved in the list below but not sent. Turn it on once dirtygraphix.com is set up for sending in Cloudflare and a test email arrives."}
+              : !data.resendConnected
+                ? "Resend isn't connected yet, so emails are saved in the list below but not sent. Connecting it is a go-live step."
+                : "Sending is off, so emails are saved in the list below but not sent. Turn it on once a test email arrives."}
           </div>
           <Toggle label="Send customer emails" checked={s.email_sending === "1"} onChange={flag("email_sending")} />
           <div className="form-grid">
             <Text id="fromname" label="From name" value={s.email_from_name ?? ""} onChange={set("email_from_name")} />
-            <Text id="fromaddr" label="From address" value={s.email_from_address ?? ""} onChange={set("email_from_address")} help="Must be on a domain set up for sending in Cloudflare." />
+            <Text id="fromaddr" label="From address" value={s.email_from_address ?? ""} onChange={set("email_from_address")} help="Must be on a domain verified in Resend (dirtygraphix.com)." />
           </div>
           <Text id="replyto" label="Reply-to address (optional)" value={s.email_reply_to ?? ""} onChange={set("email_reply_to")} help="Leave empty to keep everything on the order page. Each email tells customers replies aren't monitored." />
           <Text id="bcc" label="BCC email" value={s.email_bcc ?? ""} onChange={set("email_bcc")} placeholder="e.g. orders@dirtygraphix.com" help="If set, a copy of every customer email goes to this address." />
