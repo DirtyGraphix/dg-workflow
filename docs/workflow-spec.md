@@ -18,6 +18,18 @@ Everything runs through Shopify plus one custom app, keeping outside apps to a m
 - **Klaviyo, already in place,** sends the branded workflow emails.
 - **Shopify Flow, built in,** handles small automations such as tagging rush orders.
 
+**What counts as a design job**
+
+Each line on a Shopify order is sorted when the order arrives:
+
+- **Wrap kits** (products titled "... Wrap Kits"): one design job per kit, with customer proofs. The finish comes from the kit's "Finish Options" choice; on limited-edition kits the variant is the machine model (e.g. Kubota SVL110-3).
+- **Sheetz:** their own design job, proofed like a wrap kit. The size and finish come from the "Sheetz Size" and "Finishes" lines.
+- **Contractor Grade Decals:** a design job with proofs. Size and quantity come from the order.
+- **Matching Wrapped Yetis:** printed at the end of the run using the approved machine design. No proof of its own, and the customer never sees one. It's approved automatically once every machine design on the order is approved, prints in that machine's finish, and needs its own length logged at hand-off.
+- **Everything else** (application kits, ADHESOFF, apparel and other products) skips design. It's listed on the order as "Also ships," and an order with nothing to design goes straight to production to ship.
+- Option lines from the product options app (Finish, Application Kit) attach to the kit they were added to. Prices in option values are removed, so they never reach design or production.
+- Which product titles count as kits, Sheetz or other design products is a setting, so new product types can be added without code changes.
+
 **Replacing Approve Pro**
 
 The built-in proof page replaces Approve Pro. That's one less app, proofs carry Dirty Graphix branding, and proof and approval timestamps feed the design stats directly.
