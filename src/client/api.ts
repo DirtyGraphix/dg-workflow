@@ -17,18 +17,37 @@ export async function api<T = any>(method: string, path: string, body?: unknown)
     body: body === undefined ? undefined : JSON.stringify(body),
     credentials: "same-origin",
   });
-  const text = await res.text();
-  const json = text ? JSON.parse(text) : null;
-  if (!res.ok) throw new ApiError(json?.error ?? "Something went wrong", res.status, json?.data ?? null);
-  return json as T;
+  return readResponse<T>(res);
 }
 
 /** Same as api(), for forms with files (proof uploads). */
 export async function upload<T = any>(path: string, form: FormData): Promise<T> {
-  const res = await fetch(`/api${path}`, { method: "POST", body: form, credentials: "same-origin" });
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, { method: "POST", body: form, credentials: "same-origin" });
+  } catch {
+    throw new ApiError("The upload didn't reach the app. Check your internet connection and try again.", 0);
+  }
+  return readResponse<T>(res);
+}
+
+/**
+ * Reads the app's JSON answer. When something in front of the app answers instead (for example
+ * Cloudflare's own error page), says so with its status and error code, so the real cause shows on screen.
+ */
+async function readResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
-  const json = text ? JSON.parse(text) : null;
-  if (!res.ok) throw new ApiError(json?.error ?? "Something went wrong", res.status, json?.data ?? null);
+  let json: any = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    const code = text.match(/Error\s+(\d{4})/)?.[1];
+    throw new ApiError(
+      `The server didn't answer normally (status ${res.status}${code ? `, Cloudflare error ${code}` : ""}). Send this message to Claude.`,
+      res.status,
+    );
+  }
+  if (!res.ok) throw new ApiError(json?.error ?? `Something went wrong (status ${res.status})`, res.status, json?.data ?? null);
   return json as T;
 }
 
