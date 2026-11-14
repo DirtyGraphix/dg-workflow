@@ -535,7 +535,7 @@ describe("customer proof page", () => {
   });
 });
 
-describe("sending customer emails with Cloudflare", () => {
+describe("sending customer emails with Resend", () => {
   it("renders the branded email from the design tokens", async () => {
     const { renderEmail } = await import("../src/worker/lib/email");
     const { html, text } = renderEmail({ kind: "proof_ready", subject: "S", heading: "Your custom design is ready!", body: "Hi Rick!\n\nLook it over.", button_label: "Review design", button_url: "https://dg.test/proof/abc", order_number: "#514860020" });
@@ -549,20 +549,22 @@ describe("sending customer emails with Cloudflare", () => {
   it("holds emails while sending is off, then sends and marks them", async () => {
     const { deliverOutbox } = await import("../src/worker/lib/email");
     const sent: any[] = [];
-    const fake = { DB: env.DB, EMAIL: { send: async (m: any) => (sent.push(m), { messageId: "x" }) } as unknown as SendEmail };
-    expect((await deliverOutbox(fake)).on).toBe(false);
+    const mailer = async (m: any) => void sent.push(m);
+    expect((await deliverOutbox({ DB: env.DB }, 25, null)).on).toBe(false); // Resend not connected
+    expect((await deliverOutbox({ DB: env.DB }, 25, mailer)).on).toBe(false); // sending switched off
     expect(sent).toHaveLength(0);
     expect((await ty.req("PUT", "/api/proof-settings", { email_from_address: "not-an-email" })).status).toBe(400);
     await ty.req("PUT", "/api/proof-settings", { email_sending: "1", email_reply_to: "orders@dirtygraphix.com" });
-    const r = await deliverOutbox(fake, 3);
+    const r = await deliverOutbox({ DB: env.DB }, 3, mailer);
     expect(r).toMatchObject({ on: true, sent: 3, failed: 0 });
     expect(sent[0]).toMatchObject({ from: { name: "Dirty Graphix", email: "no_reply@dirtygraphix.com" }, replyTo: "orders@dirtygraphix.com" });
+    expect(sent[0].idempotencyKey).toMatch(/^dgw-outbox-\d+$/);
     expect(sent[0].html).toContain("<!doctype html>");
     const counts = await env.DB.prepare("SELECT status, COUNT(*) AS n FROM outbox GROUP BY status").all<{ status: string; n: number }>();
     expect(counts.results.find((x) => x.status === "sent")?.n).toBe(3);
     // A failure is kept and retried later, not lost.
-    const broken = { DB: env.DB, EMAIL: { send: async () => { throw new Error("domain not verified"); } } as unknown as SendEmail };
-    expect((await deliverOutbox(broken, 1)).failed).toBe(1);
+    const broken = async () => { throw new Error("domain not verified"); };
+    expect((await deliverOutbox({ DB: env.DB }, 1, broken)).failed).toBe(1);
     const row = await env.DB.prepare("SELECT status, attempts, error FROM outbox WHERE error IS NOT NULL").first<Json>();
     expect(row).toMatchObject({ status: "pending", attempts: 1, error: "domain not verified" });
     await ty.req("PUT", "/api/proof-settings", { email_sending: "0", email_reply_to: "" });
@@ -574,5 +576,30 @@ describe("sending customer emails with Cloudflare", () => {
     const p = await ty.req("POST", "/api/proof-settings/preview", { kind: "proof_ready", template });
     expect(p.json.subject).toBe("Hi Rick");
     expect(p.json.html).toContain("For CAT 250 and JCB 4TS-8T");
+  });
+});
+
+describe("the Resend connection", () => {
+  it("posts the email to Resend with the sender, reply-to and a no-duplicates key", async () => {
+    const { resendMailer } = await import("../src/worker/lib/email");
+    expect(resendMailer(undefined)).toBeNull();
+    const calls: { url: string; init: RequestInit }[] = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return new Response(JSON.stringify(calls.length === 1 ? { id: "abc" } : { message: "The dirtygraphix.com domain is not verified" }), { status: calls.length === 1 ? 200 : 403 });
+    }) as typeof fetch;
+    try {
+      const send = resendMailer("re_test")!;
+      await send({ from: { name: "Dirty Graphix", email: "no_reply@dirtygraphix.com" }, to: "rick@example.com", subject: "S", html: "<p>H</p>", text: "T", replyTo: "orders@dirtygraphix.com", idempotencyKey: "dgw-outbox-7" });
+      expect(calls[0].url).toBe("https://api.resend.com/emails");
+      const headers = calls[0].init.headers as Record<string, string>;
+      expect(headers.authorization).toBe("Bearer re_test");
+      expect(headers["idempotency-key"]).toBe("dgw-outbox-7");
+      expect(JSON.parse(String(calls[0].init.body))).toEqual({ from: "Dirty Graphix <no_reply@dirtygraphix.com>", to: ["rick@example.com"], subject: "S", html: "<p>H</p>", text: "T", reply_to: "orders@dirtygraphix.com" });
+      await expect(send({ from: { name: "DG", email: "no_reply@dirtygraphix.com" }, to: "x@example.com", subject: "S", html: "", text: "" })).rejects.toThrow("Resend 403: The dirtygraphix.com domain is not verified");
+    } finally {
+      globalThis.fetch = realFetch;
+    }
   });
 });

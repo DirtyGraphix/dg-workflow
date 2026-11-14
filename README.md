@@ -1,6 +1,6 @@
 # dg-workflow
 
-Design and production workflow app for Dirty Graphix. It runs on Cloudflare (Workers, D1, R2, Email Service) with a React front end.
+Design and production workflow app for Dirty Graphix. It runs on Cloudflare (Workers, D1, R2) with a React front end. Customer emails send through Resend.
 
 - `docs/workflow-spec.md`: how the whole system works, with every rule and decision
 - `design/`: the approved look (rules, tokens, mockup screenshots and mockup sources)
@@ -23,7 +23,7 @@ Design and production workflow app for Dirty Graphix. It runs on Cloudflare (Wor
 - **Conversation on the order:** customer changes and messages land on the order, flag it "CUSTOMER WROTE" in the queue, and designers answer from the order. Nothing lives in a personal inbox.
 - **Reminders:** automatic while a proof waits (every 2 days, up to 4, never past 28 days, business hours only), plus "Send reminder" on the order.
 - **Proof settings (TY):** the Approve Pro options that still apply: change window, revision history, downloads, uploads, comment rules, approval checklist, all page wording, reminders, each customer email on/off with editable wording and a preview, BCC, reply templates, and a log of recent emails.
-- **Emails** queue in the app first, then go out through Cloudflare Email Service in one branded layout built from `design/tokens.css`. Nothing sends until TY turns on sending in Proof settings; until then the log shows them as waiting. "Send test to me" checks the setup first.
+- **Emails** queue in the app first, then go out through Resend in one branded layout built from `design/tokens.css`. Nothing sends until TY turns on sending in Proof settings; until then the log shows them as waiting. "Send test to me" checks the setup first.
 
 Next up is Phase 3: production (roll planner, production screen, receive material and labels).
 
@@ -50,10 +50,10 @@ These steps need TY's accounts. Claude can walk through each one.
 
 1. **Database and file storage** (done Nov 14, 2026): D1 database `dg-workflow` and R2 bucket `dg-workflow-proofs` in the Dirty Graphix Cloudflare account, with migrations 0001 and 0002 applied.
 2. **Deploys:** Cloudflare Workers Builds is linked to this GitHub repo and deploys `main` on every merge (build command `npm run build`, deploy command `npx wrangler deploy`).
-3. **Secrets** (set in Cloudflare under the Worker's Settings → Variables and Secrets, never in the code): `SETUP_TOKEN` (any long random phrase, used once to create TY's login) and, at Shopify hookup, `SHOPIFY_WEBHOOK_SECRET`.
+3. **Secrets** (set in Cloudflare under the Worker's Settings → Variables and Secrets, never in the code): `SETUP_TOKEN` (any long random phrase, used once to create TY's login), `RESEND_API_KEY` (customer emails) and, at Shopify hookup, `SHOPIFY_WEBHOOK_SECRET`.
 4. **First login:** open `/setup` on the live app and create the admin login with the setup token.
 5. **Connect Shopify:** create a custom app for the store and subscribe these webhooks to `https://<app address>/webhooks/shopify`: `orders/create`, `orders/updated`, `orders/paid`, `orders/cancelled`.
 6. **Add the team** on the People screen.
 7. **Proof links on dirtygraphix.com (recommended):** in the Shopify custom app, add an app proxy with prefix `apps`, subpath `proof`, and proxy URL `https://<app address>/proof`. Then enter `https://dirtygraphix.com/apps/proof` under Proof settings → Customer link address.
-8. **Customer emails:** the Cloudflare account needs the Workers Paid plan ($5/month, 3,000 emails a month included). In the Cloudflare dashboard, set up dirtygraphix.com for sending under Email Service and add the DNS records it lists. In Proof settings, check the sender (no_reply@dirtygraphix.com), click "Send test to me", and once it arrives, turn on "Send customer emails".
+8. **Customer emails (Resend):** dirtygraphix.com's DNS is at Wix, and Cloudflare's own email service only works on Cloudflare DNS, so emails go through Resend (free: 3,000 a month, 100 a day). Create a Resend account, add the domain dirtygraphix.com, and add the DNS records Resend lists in Wix (they sit on the `send` and `resend._domainkey` names, so they don't touch the store or the office inbox). Once Resend shows it verified, create an API key with "Sending access" and add it in Cloudflare as the secret `RESEND_API_KEY` (Worker → Settings → Runtime variables and secrets). In Proof settings, click "Send test to me", and once it arrives, turn on "Send customer emails".
 9. **Launch day:** new orders use the proof page. Orders already in Approve Pro finish there (designers mark them "sent in Approve Pro"), then export Approve Pro's records and cancel it.
