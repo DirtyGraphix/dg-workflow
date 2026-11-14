@@ -130,7 +130,7 @@ Finish matches what you ordered'),
   -- Email sending (Cloudflare Email Service). Off until the domain is set up and TY turns it on.
   ('email_sending', '0'),
   ('email_from_name', 'Dirty Graphix'),
-  ('email_from_address', 'orders@dirtygraphix.com'),  -- the address Approve Pro sends from today
+  ('email_from_address', 'no_reply@dirtygraphix.com'),  -- replies aren't monitored; customers answer on their order page
   ('email_reply_to', ''),
   ('email_bcc', ''),
   -- Each customer email: on/off plus its wording. {first_name} {order_number} {designer} {machines} {message}

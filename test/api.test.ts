@@ -556,7 +556,7 @@ describe("sending customer emails with Cloudflare", () => {
     await ty.req("PUT", "/api/proof-settings", { email_sending: "1", email_reply_to: "orders@dirtygraphix.com" });
     const r = await deliverOutbox(fake, 3);
     expect(r).toMatchObject({ on: true, sent: 3, failed: 0 });
-    expect(sent[0]).toMatchObject({ from: { name: "Dirty Graphix", email: "orders@dirtygraphix.com" }, replyTo: "orders@dirtygraphix.com" });
+    expect(sent[0]).toMatchObject({ from: { name: "Dirty Graphix", email: "no_reply@dirtygraphix.com" }, replyTo: "orders@dirtygraphix.com" });
     expect(sent[0].html).toContain("<!doctype html>");
     const counts = await env.DB.prepare("SELECT status, COUNT(*) AS n FROM outbox GROUP BY status").all<{ status: string; n: number }>();
     expect(counts.results.find((x) => x.status === "sent")?.n).toBe(3);
