@@ -36,6 +36,7 @@ Everything runs on Cloudflare, where Dirty Graphix already hosts the customizer'
 - Workers: the app and API, including the Shopify webhook endpoint
 - D1: the database
 - R2: photos and uploads
+- Email Service: customer emails (proofs, reminders, replies), queued in the app's outbox first
 - Cron Triggers: timed jobs (reminders, forced prints, morning summary, stalled orders)
 - Durable Objects: live updates for the shop TV and queues
 - TypeScript throughout

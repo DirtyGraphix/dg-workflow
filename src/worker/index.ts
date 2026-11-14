@@ -41,7 +41,7 @@ import {
   getSettings,
   type OrderRow,
 } from "./lib/orders";
-import { deliverOutbox, EMAIL_KINDS, EMAIL_LABELS } from "./lib/email";
+import { deliverOutbox, EMAIL_KINDS, EMAIL_LABELS, fill, renderEmail, senderFrom, type EmailKind, type EmailPayload } from "./lib/email";
 import {
   customerApprove,
   customerMessage,
@@ -526,7 +526,7 @@ api.get("/proof-settings", async (c) => {
   return c.json({
     settings: Object.fromEntries(Object.entries(all).filter(([k]) => isProofSetting(k))),
     emails: EMAIL_KINDS.map((k) => ({ kind: k, ...EMAIL_LABELS[k] })),
-    klaviyoConnected: !!c.env.KLAVIYO_PRIVATE_KEY,
+    sendingOn: all.email_sending === "1" && !!senderFrom(all),
     appOrigin: c.env.APP_ORIGIN ?? null,
     outbox: outbox.map(({ payload_json, ...r }) => ({ ...r, subject: JSON.parse(payload_json).subject as string })),
   });
@@ -538,7 +538,7 @@ api.put("/proof-settings", async (c) => {
   const stmts: D1PreparedStatement[] = [];
   for (const [k, v] of Object.entries(body)) {
     if (!isProofSetting(k) || typeof v !== "string") return c.json({ error: `Unknown setting: ${k}` }, 400);
-    if (k.startsWith("email_") && k !== "email_bcc") {
+    if (EMAIL_KINDS.some((kind) => k === `email_${kind}`)) {
       try {
         const t = JSON.parse(v);
         if (typeof t.on !== "boolean" || ![t.subject, t.heading, t.body, t.button].every((x) => typeof x === "string" && x.trim())) throw new Error();
@@ -546,11 +546,51 @@ api.put("/proof-settings", async (c) => {
         return c.json({ error: "Each email needs a subject, heading, message and button label" }, 400);
       }
     }
+    if (["email_from_address", "email_reply_to", "email_bcc"].includes(k) && v.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())) return c.json({ error: "That email address doesn't look right" }, 400);
     if (k === "proof_link_base" && v.trim() && !/^https:\/\/[^\s]+$/.test(v.trim())) return c.json({ error: "The link address has to start with https://" }, 400);
     stmts.push(c.env.DB.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(k, v));
   }
   if (stmts.length) await c.env.DB.batch(stmts);
   return c.json({ ok: true });
+});
+
+// What a customer email looks like, with sample details, for the preview in Proof settings.
+const SAMPLE_VARS = { first_name: "Rick", order_number: "514863584", designer: "Alissa", machines: "CAT 250 and JCB 4TS-8T", message: "Can you send a vector version of your logo?" };
+function samplePayload(kind: EmailKind, t: { subject: string; heading: string; body: string; button: string }, link: string): EmailPayload {
+  return {
+    kind,
+    subject: fill(t.subject, SAMPLE_VARS),
+    heading: fill(t.heading, SAMPLE_VARS),
+    body: fill(t.body, SAMPLE_VARS),
+    button_label: fill(t.button, SAMPLE_VARS),
+    button_url: link,
+    order_number: SAMPLE_VARS.order_number,
+  };
+}
+
+api.post("/proof-settings/preview", async (c) => {
+  if (c.get("person").role !== "admin") return forbid(c);
+  const b = await c.req.json<{ kind: EmailKind; template: { subject: string; heading: string; body: string; button: string } }>();
+  if (!EMAIL_KINDS.includes(b.kind)) return c.json({ error: "Unknown email" }, 400);
+  const p = samplePayload(b.kind, b.template, `${origin(c)}/proof/sample`);
+  return c.json({ subject: p.subject, html: renderEmail(p).html });
+});
+
+// Sends one sample email to whoever is signed in, even before sending is turned on, to check the domain setup.
+api.post("/proof-settings/test-email", async (c) => {
+  const me = c.get("person");
+  if (me.role !== "admin") return forbid(c);
+  const settings = await getSettings(c.env.DB);
+  const from = senderFrom(settings);
+  if (!from) return c.json({ error: "Add a sender address first" }, 400);
+  const p = samplePayload("proof_ready", JSON.parse(settings.email_proof_ready), `${origin(c)}/proof/sample`);
+  const { html, text } = renderEmail(p);
+  try {
+    await c.env.EMAIL.send({ from, to: me.email, subject: `[Test] ${p.subject}`, html, text });
+  } catch (e) {
+    return c.json({ error: `Cloudflare didn't send it: ${e instanceof Error ? e.message : String(e)}` }, 502);
+  }
+  return c.json({ ok: true, to: me.email });
 });
 
 const canEditTemplates = (p: Person) => p.role === "admin" || p.role === "lead";

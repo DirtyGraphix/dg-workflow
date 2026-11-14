@@ -1,6 +1,6 @@
 # dg-workflow
 
-Design and production workflow app for Dirty Graphix. It runs on Cloudflare (Workers, D1, R2) with a React front end.
+Design and production workflow app for Dirty Graphix. It runs on Cloudflare (Workers, D1, R2, Email Service) with a React front end.
 
 - `docs/workflow-spec.md`: how the whole system works, with every rule and decision
 - `design/`: the approved look (rules, tokens, mockup screenshots and mockup sources)
@@ -23,7 +23,7 @@ Design and production workflow app for Dirty Graphix. It runs on Cloudflare (Wor
 - **Conversation on the order:** customer changes and messages land on the order, flag it "CUSTOMER WROTE" in the queue, and designers answer from the order. Nothing lives in a personal inbox.
 - **Reminders:** automatic while a proof waits (every 2 days, up to 4, never past 28 days, business hours only), plus "Send reminder" on the order.
 - **Proof settings (TY):** the Approve Pro options that still apply: change window, revision history, downloads, uploads, comment rules, approval checklist, all page wording, reminders, each customer email on/off with editable wording and a preview, BCC, reply templates, and a log of recent emails.
-- **Emails** queue in the app first, then go out through Klaviyo as a "DG Workflow Email" event once the Klaviyo key is set. Until then nothing is sent and the log shows them as waiting.
+- **Emails** queue in the app first, then go out through Cloudflare Email Service in one branded layout built from `design/tokens.css`. Nothing sends until TY turns on sending in Proof settings; until then the log shows them as waiting. "Send test to me" checks the setup first.
 
 Next up is Phase 3: production (roll planner, production screen, receive material and labels).
 
@@ -50,11 +50,10 @@ These steps need TY's accounts. Claude can walk through each one.
 2. **Set the secrets** (never put these in the code):
    - `npx wrangler secret put SETUP_TOKEN`: any long random phrase, used once to create TY's admin login.
    - `npx wrangler secret put SHOPIFY_WEBHOOK_SECRET`: from the Shopify app's settings.
-   - `npx wrangler secret put KLAVIYO_PRIVATE_KEY`: a Klaviyo private API key with Events write access (see the Klaviyo step). Leave it unset until the Klaviyo flow is ready; emails just wait.
 3. **Create the file storage** for proofs and customer uploads: `npx wrangler r2 bucket create dg-workflow-proofs`. After the first deploy, fill in `APP_ORIGIN` in `wrangler.jsonc` with the app's address so reminder emails link correctly.
 4. **Deploy:** `npm run deploy`. Then open `/setup` on the live app and create the admin login with the setup token.
 5. **Connect Shopify:** create a custom app for the store and subscribe these webhooks to `https://<app address>/webhooks/shopify`: `orders/create`, `orders/updated`, `orders/paid`, `orders/cancelled`.
 6. **Add the team** on the People screen.
 7. **Proof links on dirtygraphix.com (recommended):** in the Shopify custom app, add an app proxy with prefix `apps`, subpath `proof`, and proxy URL `https://<app address>/proof`. Then enter `https://dirtygraphix.com/apps/proof` under Proof settings → Customer link address.
-8. **Klaviyo:** build one flow triggered by the "DG Workflow Email" metric, with one branded email that uses the event's `subject`, `heading`, `body`, `button_label` and `button_url`. Turn off Smart Sending for it and ask Klaviyo to mark it transactional, so every proof email sends. Then set the `KLAVIYO_PRIVATE_KEY` secret.
+8. **Customer emails:** the Cloudflare account needs the Workers Paid plan ($5/month, 3,000 emails a month included). In the Cloudflare dashboard, set up dirtygraphix.com for sending under Email Service and add the DNS records it lists. In Proof settings, check the sender (orders@dirtygraphix.com), click "Send test to me", and once it arrives, turn on "Send customer emails".
 9. **Launch day:** new orders use the proof page. Orders already in Approve Pro finish there (designers mark them "sent in Approve Pro"), then export Approve Pro's records and cancel it.

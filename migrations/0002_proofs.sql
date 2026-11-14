@@ -127,7 +127,11 @@ Finish matches what you ordered'),
   ('reminder_recurring', '1'),
   ('reminder_max', '4'),
   ('reminder_stop_days', '28'),
-  -- Email sending
+  -- Email sending (Cloudflare Email Service). Off until the domain is set up and TY turns it on.
+  ('email_sending', '0'),
+  ('email_from_name', 'Dirty Graphix'),
+  ('email_from_address', 'orders@dirtygraphix.com'),  -- the address Approve Pro sends from today
+  ('email_reply_to', ''),
   ('email_bcc', ''),
   -- Each customer email: on/off plus its wording. {first_name} {order_number} {designer} {machines} {message}
   ('email_proof_ready', '{"on":true,"subject":"Your Dirty Graphix proof is ready","heading":"Your custom design is ready!","body":"Hi {first_name}! {designer} finished your proof for {machines}. Look it over and approve it or tell us what to change.","button":"Review design"}'),

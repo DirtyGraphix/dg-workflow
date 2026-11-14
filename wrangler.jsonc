@@ -22,6 +22,11 @@
   ],
   // Proof images and customer uploads.
   "r2_buckets": [{ "binding": "PROOFS", "bucket_name": "dg-workflow-proofs" }],
+  // Customer emails, sent with Cloudflare Email Service. The sender address is set in Proof settings and
+  // its domain (dirtygraphix.com) must be set up for sending in the Cloudflare dashboard first.
+  "send_email": [{ "name": "EMAIL" }],
+  // The design tokens are read into the email layout, so emails use the same colors and fonts.
+  "rules": [{ "type": "Text", "globs": ["**/*.css"], "fallthrough": true }],
   // Hourly job: proof reminders and email delivery.
   "triggers": { "crons": ["0 * * * *"] },
   "vars": {
@@ -33,5 +38,4 @@
   // Secrets (set with `wrangler secret put`, never committed):
   //   SHOPIFY_WEBHOOK_SECRET  verifies that order webhooks really came from Shopify
   //   SETUP_TOKEN             one-time token for creating the first admin login
-  //   KLAVIYO_PRIVATE_KEY     sends customer emails through Klaviyo (emails wait in the outbox until it's set)
 }

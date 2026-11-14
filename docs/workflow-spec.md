@@ -15,7 +15,7 @@ Everything runs through Shopify plus one custom app, keeping outside apps to a m
 
 - **One custom web app connected to Shopify:** the design view, production screen, roll planner, checklists and reports. Everyone signs in with the app's own logins, not Shopify staff accounts. The store is on the Grow plan, which has 5 staff seats, so this keeps the seats free and lets people be added without upgrading. Native B2B is Plus-only, but dealers already run through the dealer-b2b Market, which works on Grow.
 - **Shopify stays the source of truth:** orders, customers, rush add-ons, shipping labels and fulfillment. A new order creates a job automatically, and marking the order fulfilled closes the job and sends Shopify's shipping email.
-- **Klaviyo, already in place,** sends the branded workflow emails.
+- **Cloudflare Email Service** sends the branded workflow emails straight from the app (switched from Klaviyo on Nov 14, 2026, so wording and look live in one place).
 - **Shopify Flow, built in,** handles small automations such as tagging rush orders.
 
 **What counts as a design job**
@@ -261,7 +261,7 @@ Two emails cover the gap between approval and shipping. Shopify's existing shipp
 
 **Everything stays in the system.** All customer emails send from the no-reply address. A reply gets an automatic kickback pointing the customer to their order page. Each email links to that page, where the customer can approve, request changes, upload files, answer a question or send a message. Every response lands on the order's timeline, the designer is notified, and nothing lives in a personal inbox.
 
-**Proof emails (replacing Approve Pro's emails):** Proof ready (with the proof link), Revision ready, Reminders while a proof waits (automatic on a schedule to be set, or sent by hand from the order), and Approved (a thank-you confirmation). All of them, plus the two below, go out through Klaviyo on one branded template.
+**Proof emails (replacing Approve Pro's emails):** Proof ready (with the proof link), Revision ready, Reminders while a proof waits (automatic on a schedule to be set, or sent by hand from the order), and Approved (a thank-you confirmation). All of them, plus the two below, go out through Cloudflare Email Service on one branded layout.
 
 **1. In the production queue** (sent at hand-off)
 
@@ -404,7 +404,7 @@ Each finish fills its rolls oldest-first and gap-fills to 95%. Normal jobs never
 TY builds it with Claude Code, in phases. Each phase is usable before the next starts. The look is locked: every screen follows design/DESIGN.md and design/tokens.css (saved in this project under workflow-app/) and must match its approved mockup screenshot before it's called done.
 
 1. **Foundation:** a custom Shopify app with its own database. New orders arrive by webhook and become jobs. Includes team lead assignment, the designer view (timer, checklist, length, hand-off) and manual jobs.
-2. **Proof page and emails:** a branded proof page served on dirtygraphix.com (like the customizer at /apps/designer), plus the Klaviyo emails. This replaces Approve Pro, so it has to be ready by launch day.
+2. **Proof page and emails:** a branded proof page served on dirtygraphix.com (like the customizer at /apps/designer), plus the customer emails. This replaces Approve Pro, so it has to be ready by launch day.
 3. **Production:** the roll planner (finishes, cut sections, Gravel Guard and Prismatic rolls, remnants), the production screen, receive material, and 4 x 6 and 3 x 2 labels sent to the Zebras.
 4. **Reports and screens:** the weekly and monthly emails, efficiency scores, both TVs and sounds.
 5. **Extras:** reprint and print-error flows, stalled orders, the rush on/off switch in the theme, true cost, and material forecasting.

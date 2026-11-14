@@ -1,8 +1,9 @@
 // Customer emails. Every email is queued in the outbox first, so nothing is lost and TY can see what went out.
-// Klaviyo does the sending: each email becomes a "DG Workflow Email" event, and one Klaviyo flow with one
-// branded template turns it into the email. Nothing is sent until KLAVIYO_PRIVATE_KEY is set.
+// Cloudflare Email Service sends them straight from the app, in one branded layout built here.
+// Nothing is sent until TY turns on sending in Proof settings (after the domain is set up in Cloudflare).
 
 import type { Env } from "../env";
+import tokensCss from "../../../design/tokens.css";
 
 export const EMAIL_KINDS = ["proof_ready", "revision_ready", "reminder", "approved", "changes_received", "reply", "message"] as const;
 export type EmailKind = (typeof EMAIL_KINDS)[number];
@@ -25,7 +26,6 @@ export interface EmailTemplate {
   button: string;
 }
 
-export const KLAVIYO_METRIC = "DG Workflow Email";
 
 export function readTemplate(settings: Record<string, string>, kind: EmailKind): EmailTemplate | null {
   try {
@@ -70,7 +70,7 @@ export async function queueEmail(
 ): Promise<boolean> {
   const t = readTemplate(settings, e.kind);
   if (!t?.on || !e.to) return false;
-  const payload = {
+  const payload: EmailPayload = {
     kind: e.kind,
     subject: fill(t.subject, e.vars),
     heading: fill(t.heading, e.vars),
@@ -96,52 +96,123 @@ export async function queueEmail(
   return true;
 }
 
-/** Sends pending emails to Klaviyo. Does nothing until the Klaviyo key is set. */
-export async function deliverOutbox(env: Env, limit = 25): Promise<{ sent: number; failed: number; connected: boolean }> {
-  const key = env.KLAVIYO_PRIVATE_KEY;
-  if (!key) return { sent: 0, failed: 0, connected: false };
+// ---------- the branded layout ----------
+
+// Email programs can't read CSS variables, so the colors and fonts are read out of design/tokens.css.
+function token(name: string): string {
+  const m = tokensCss.match(new RegExp(`--${name}:\\s*([^;]+);`));
+  if (!m) throw new Error(`Missing design token --${name}`);
+  return m[1].trim().replace(/"/g, "'");
+}
+
+const escHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+
+export interface EmailPayload {
+  kind: string;
+  subject: string;
+  heading: string;
+  body: string;
+  button_label: string;
+  button_url: string;
+  order_number: string;
+  first_name?: string;
+  designer?: string;
+  copy_for?: string;
+}
+
+/** The email customers get: brand bar, order number, heading, message, button. Matches the preview in Proof settings. */
+export function renderEmail(p: EmailPayload): { html: string; text: string } {
+  const t = {
+    bg: token("bg"),
+    surface: token("surface"),
+    border: token("border"),
+    brand: token("brand"),
+    onColor: token("on-color"),
+    text: token("text"),
+    text2: token("text-2"),
+    muted: token("muted"),
+    headerBg: token("header-bg"),
+    headerText: token("header-text"),
+    display: token("font-display"),
+    body: token("font-body"),
+  };
+  const order = p.order_number.replace(/^#/, "");
+  const paragraphs = p.body
+    .split(/\n{2,}/)
+    .map((para) => `<p style="margin:0 0 16px;font-family:${t.body};font-size:16px;line-height:1.55;color:${t.text2}">${escHtml(para).replace(/\n/g, "<br>")}</p>`)
+    .join("");
+  const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escHtml(p.subject)}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&amp;family=Inter:wght@400;600&amp;display=swap"></head>
+<body style="margin:0;padding:0;background:${t.bg}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${t.bg}"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:${t.surface};border:1px solid ${t.border};border-radius:12px;overflow:hidden">
+<tr><td style="background:${t.headerBg};border-bottom:4px solid ${t.brand};padding:18px 24px">
+<span style="font-family:${t.display};font-weight:700;font-size:20px;letter-spacing:.14em;text-transform:uppercase;color:${t.headerText}">Dirty Graphix</span>
+<span style="float:right;font-family:${t.body};font-size:13px;line-height:24px;color:${t.headerText};opacity:.7">Order #${escHtml(order)}</span>
+</td></tr>
+<tr><td style="padding:28px 24px 8px">
+<h1 style="margin:0 0 16px;font-family:${t.display};font-weight:700;font-size:30px;line-height:1.05;text-transform:uppercase;color:${t.text}">${escHtml(p.heading)}</h1>
+${paragraphs}
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 24px"><tr><td style="border-radius:10px;background:${t.brand}">
+<a href="${escHtml(p.button_url)}" style="display:inline-block;padding:14px 26px;font-family:${t.display};font-weight:700;font-size:20px;letter-spacing:.05em;text-transform:uppercase;color:${t.onColor};text-decoration:none">${escHtml(p.button_label)}</a>
+</td></tr></table>
+</td></tr>
+<tr><td style="padding:16px 24px 24px;border-top:1px solid ${t.border};font-family:${t.body};font-size:13px;line-height:1.5;color:${t.muted}">
+Replies to this email aren't monitored. Use the button above to reach your designer. Everything you send there goes straight to your order.
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+  const text = `${p.heading}\n\n${p.body}\n\n${p.button_label}: ${p.button_url}\n\nOrder #${order}\nReplies to this email aren't monitored. Use the link above to reach your designer.`;
+  return { html, text };
+}
+
+// ---------- sending ----------
+
+export function senderFrom(settings: Record<string, string>) {
+  const email = settings.email_from_address?.trim();
+  if (!email) return null;
+  return { name: settings.email_from_name?.trim() || "Dirty Graphix", email };
+}
+
+/**
+ * Sends waiting emails through Cloudflare Email Service. Does nothing while sending is turned off.
+ * A failed email is retried on later runs, up to 5 tries.
+ */
+export async function deliverOutbox(env: Pick<Env, "DB" | "EMAIL">, limit = 25): Promise<{ sent: number; failed: number; on: boolean }> {
+  const settings = Object.fromEntries(
+    (await env.DB.prepare("SELECT key, value FROM settings WHERE key LIKE 'email_%'").all<{ key: string; value: string }>()).results.map((r) => [r.key, r.value]),
+  );
+  const from = senderFrom(settings);
+  if (settings.email_sending !== "1" || !from || !env.EMAIL) return { sent: 0, failed: 0, on: false };
   const { results } = await env.DB
-    .prepare("SELECT id, to_email, payload_json, created_at FROM outbox WHERE status = 'pending' AND attempts < 5 ORDER BY id LIMIT ?")
+    .prepare("SELECT id, to_email, payload_json FROM outbox WHERE status = 'pending' AND attempts < 5 ORDER BY id LIMIT ?")
     .bind(limit)
-    .all<{ id: number; to_email: string; payload_json: string; created_at: string }>();
+    .all<{ id: number; to_email: string; payload_json: string }>();
   let sent = 0;
   let failed = 0;
   for (const row of results) {
-    const body = {
-      data: {
-        type: "event",
-        attributes: {
-          properties: JSON.parse(row.payload_json),
-          metric: { data: { type: "metric", attributes: { name: KLAVIYO_METRIC } } },
-          profile: { data: { type: "profile", attributes: { email: row.to_email } } },
-          unique_id: `dgw-outbox-${row.id}`,
-          time: row.created_at,
-        },
-      },
-    };
-    let error: string | null = null;
+    const payload = JSON.parse(row.payload_json) as EmailPayload;
+    const { html, text } = renderEmail(payload);
     try {
-      const res = await fetch("https://a.klaviyo.com/api/events", {
-        method: "POST",
-        headers: {
-          Authorization: `Klaviyo-API-Key ${key}`,
-          revision: "2024-10-15",
-          "content-type": "application/vnd.api+json",
-          accept: "application/vnd.api+json",
-        },
-        body: JSON.stringify(body),
+      await env.EMAIL.send({
+        from,
+        to: row.to_email,
+        subject: payload.subject,
+        html,
+        text,
+        ...(settings.email_reply_to?.trim() ? { replyTo: settings.email_reply_to.trim() } : {}),
       });
-      if (!res.ok) error = `Klaviyo ${res.status}: ${(await res.text()).slice(0, 300)}`;
-    } catch (err) {
-      error = String(err).slice(0, 300);
-    }
-    if (error) {
-      failed++;
-      await env.DB.prepare("UPDATE outbox SET attempts = attempts + 1, error = ?, status = CASE WHEN attempts + 1 >= 5 THEN 'failed' ELSE status END WHERE id = ?").bind(error, row.id).run();
-    } else {
       sent++;
       await env.DB.prepare("UPDATE outbox SET status = 'sent', sent_at = ?, attempts = attempts + 1, error = NULL WHERE id = ?").bind(new Date().toISOString(), row.id).run();
+    } catch (err) {
+      failed++;
+      await env.DB
+        .prepare("UPDATE outbox SET attempts = attempts + 1, error = ?, status = CASE WHEN attempts + 1 >= 5 THEN 'failed' ELSE status END WHERE id = ?")
+        .bind(String(err instanceof Error ? err.message : err).slice(0, 300), row.id)
+        .run();
     }
   }
-  return { sent, failed, connected: true };
+  return { sent, failed, on: true };
 }

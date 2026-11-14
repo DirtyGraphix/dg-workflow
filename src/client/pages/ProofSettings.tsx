@@ -18,13 +18,31 @@ interface EmailTemplate {
 interface SettingsResponse {
   settings: Settings;
   emails: { kind: string; name: string; when: string }[];
-  klaviyoConnected: boolean;
+  sendingOn: boolean;
   appOrigin: string | null;
   outbox: { id: number; kind: string; toEmail: string; status: string; createdAt: string; sentAt: string | null; error: string | null; orderNumber: string | null; sentBy: string | null; subject: string }[];
 }
 
-const SAMPLE = { first_name: "Rick", order_number: "514863584", designer: "Alissa", machines: "Bobcat T770 and JCB 4TS-8T", message: "Can you send a vector version of your logo?" };
-const sample = (s: string) => s.replace(/\{(\w+)\}/g, (m, k: string) => (SAMPLE as Record<string, string>)[k] ?? m);
+/** The real email, rendered by the app with sample details, so what TY sees is what customers get. */
+function EmailPreview({ kind, template }: { kind: string; template: EmailTemplate }) {
+  const [preview, setPreview] = useState<{ subject: string; html: string } | null>(null);
+  const key = JSON.stringify(template);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      api<{ subject: string; html: string }>("POST", "/proof-settings/preview", { kind, template }).then(setPreview, () => undefined);
+    }, 250);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind, key]);
+  return (
+    <div className="stack">
+      <span className="field__label">Preview</span>
+      <span className="small muted">Subject: {preview?.subject ?? "…"}</span>
+      <iframe className="email-frame" title={`Preview of the ${kind.replace(/_/g, " ")} email`} srcDoc={preview?.html ?? ""} sandbox="" />
+      <span className="help">Shown with sample details. This is exactly what the customer gets.</span>
+    </div>
+  );
+}
 
 function Card({ title, intro, children, onSave, saveLabel = "Save", status }: { title: string; intro?: ReactNode; children: ReactNode; onSave?: () => void; saveLabel?: string; status?: ReactNode }) {
   return (
@@ -114,6 +132,7 @@ export function ProofSettings({ me }: { me: Me }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [templates, setTemplates] = useState<ReplyTemplate[]>([]);
   const [draft, setDraft] = useState<{ id: number | null; name: string; body: string } | null>(null);
+  const [testNote, setTestNote] = useState<{ ok: boolean; text: string } | null>(null);
 
   const load = useCallback(async () => {
     const d = await api<SettingsResponse>("GET", "/proof-settings");
@@ -142,6 +161,16 @@ export function ProofSettings({ me }: { me: Me }) {
     }
   };
   const savedNote = (section: string) => (saved === section ? <span className="small" style={{ color: "var(--success)", fontWeight: 600 }}>Saved</span> : null);
+
+  const sendTest = async () => {
+    setTestNote(null);
+    try {
+      const r = await api<{ to: string }>("POST", "/proof-settings/test-email");
+      setTestNote({ ok: true, text: `Test sent to ${r.to}` });
+    } catch (e) {
+      setTestNote({ ok: false, text: e instanceof ApiError ? e.message : "Couldn't send the test" });
+    }
+  };
 
   const saveTemplate = async () => {
     if (!draft) return;
@@ -291,18 +320,7 @@ export function ProofSettings({ me }: { me: Me }) {
                         <Text id={`${e.kind}-body`} label="Message" value={t.body} onChange={(v) => setTpl(e.kind, { body: v })} multiline />
                         <Text id={`${e.kind}-button`} label="Button" value={t.button} onChange={(v) => setTpl(e.kind, { button: v })} />
                       </div>
-                      <div className="stack">
-                        <span className="field__label">Preview</span>
-                        <span className="small muted">Subject: {sample(t.subject)}</span>
-                        <div className="email-preview">
-                          <span className="email-preview__brand">Dirty Graphix</span>
-                          <span className="small muted">Order #{SAMPLE.order_number}</span>
-                          <h3 className="email-preview__heading">{sample(t.heading)}</h3>
-                          <p className="email-preview__body">{sample(t.body)}</p>
-                          <span className="email-preview__button">{sample(t.button)}</span>
-                        </div>
-                        <span className="help">The final look comes from the branded Klaviyo template. This shows the words.</span>
-                      </div>
+                      <EmailPreview kind={e.kind} template={t} />
                     </div>
                   )}
                 </div>
@@ -311,12 +329,31 @@ export function ProofSettings({ me }: { me: Me }) {
           </div>
         </Card>
 
-        <Card title="Email sending" onSave={save("sending", ["email_bcc"])} status={savedNote("sending")}>
-          <div className={`notice${data.klaviyoConnected ? "" : " notice--warn"}`}>
-            {data.klaviyoConnected
-              ? "Connected to Klaviyo. Emails send within a minute of being queued."
-              : "Klaviyo isn't connected yet, so emails are saved below but not sent. Connecting it is a go-live step."}
+        <Card
+          title="Email sending"
+          intro="Customer emails send from this app through Cloudflare."
+          onSave={save("sending", ["email_sending", "email_from_name", "email_from_address", "email_reply_to", "email_bcc"])}
+          status={
+            <>
+              {savedNote("sending")}
+              {testNote && <span className="small" style={{ color: testNote.ok ? "var(--success)" : "var(--danger)", fontWeight: 600 }}>{testNote.text}</span>}
+              <button type="button" className="btn" onClick={sendTest}>
+                Send test to me
+              </button>
+            </>
+          }
+        >
+          <div className={`notice${data.sendingOn ? "" : " notice--warn"}`}>
+            {data.sendingOn
+              ? "Sending is on. Emails go out within a minute."
+              : "Sending is off, so emails are saved in the list below but not sent. Turn it on once dirtygraphix.com is set up for sending in Cloudflare and a test email arrives."}
           </div>
+          <Toggle label="Send customer emails" checked={s.email_sending === "1"} onChange={flag("email_sending")} />
+          <div className="form-grid">
+            <Text id="fromname" label="From name" value={s.email_from_name ?? ""} onChange={set("email_from_name")} />
+            <Text id="fromaddr" label="From address" value={s.email_from_address ?? ""} onChange={set("email_from_address")} help="Must be on a domain set up for sending in Cloudflare." />
+          </div>
+          <Text id="replyto" label="Reply-to address (optional)" value={s.email_reply_to ?? ""} onChange={set("email_reply_to")} help="Leave empty to keep everything on the order page. Each email tells customers replies aren't monitored." />
           <Text id="bcc" label="BCC email" value={s.email_bcc ?? ""} onChange={set("email_bcc")} placeholder="e.g. orders@dirtygraphix.com" help="If set, a copy of every customer email goes to this address." />
         </Card>
 
@@ -394,7 +431,7 @@ export function ProofSettings({ me }: { me: Me }) {
                         ) : o.status === "failed" ? (
                           <span className="pill pill--danger" title={o.error ?? ""}>Failed</span>
                         ) : (
-                          <span className="pill">{data.klaviyoConnected ? "Sending" : "Waiting for Klaviyo"}</span>
+                          <span className="pill">{data.sendingOn ? "Sending" : "Waiting: sending is off"}</span>
                         )}
                       </td>
                     </tr>

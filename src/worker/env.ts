@@ -13,8 +13,8 @@ declare global {
       SHOPIFY_WEBHOOK_SECRET: string;
       /** Secret: one-time token for creating the first admin login. */
       SETUP_TOKEN?: string;
-      /** Secret: Klaviyo private API key with Events write access. Emails wait in the outbox until it's set. */
-      KLAVIYO_PRIVATE_KEY?: string;
+      /** Cloudflare Email Service: sends customer emails (proofs, reminders, replies). */
+      EMAIL: SendEmail;
     }
   }
 }

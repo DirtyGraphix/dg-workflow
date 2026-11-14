@@ -516,7 +516,7 @@ describe("customer proof page", () => {
   it("keeps proof settings to TY and validates email wording", async () => {
     expect((await alissa.req("GET", "/api/proof-settings")).status).toBe(403);
     const s = await ty.req("GET", "/api/proof-settings");
-    expect(s.json.klaviyoConnected).toBe(false);
+    expect(s.json.sendingOn).toBe(false);
     expect(s.json.settings.proof_change_window_minutes).toBe("30");
     expect(s.json.outbox.length).toBeGreaterThan(0);
     expect((await ty.req("PUT", "/api/proof-settings", { email_reminder: JSON.stringify({ on: true, subject: "", heading: "h", body: "b", button: "x" }) })).status).toBe(400);
@@ -532,5 +532,47 @@ describe("customer proof page", () => {
     expect((await alissa.req("POST", "/api/reply-templates", { name: "x", body: "y" })).status).toBe(403);
     expect((await cierra.req("POST", "/api/reply-templates", { name: "First proof", body: "Hey {first_name}, here's your first mockup!" })).status).toBe(201);
     expect((await alissa.req("GET", "/api/reply-templates")).json.map((t: Json) => t.name)).toEqual(["First proof"]);
+  });
+});
+
+describe("sending customer emails with Cloudflare", () => {
+  it("renders the branded email from the design tokens", async () => {
+    const { renderEmail } = await import("../src/worker/lib/email");
+    const { html, text } = renderEmail({ kind: "proof_ready", subject: "S", heading: "Your custom design is ready!", body: "Hi Rick!\n\nLook it over.", button_label: "Review design", button_url: "https://dg.test/proof/abc", order_number: "#514860020" });
+    expect(html).toContain("#FF8A1F"); // --brand from design/tokens.css
+    expect(html).toContain("Order #514860020");
+    expect(html).toContain('href="https://dg.test/proof/abc"');
+    expect(html).not.toContain("var(--");
+    expect(text).toContain("Review design: https://dg.test/proof/abc");
+  });
+
+  it("holds emails while sending is off, then sends and marks them", async () => {
+    const { deliverOutbox } = await import("../src/worker/lib/email");
+    const sent: any[] = [];
+    const fake = { DB: env.DB, EMAIL: { send: async (m: any) => (sent.push(m), { messageId: "x" }) } as unknown as SendEmail };
+    expect((await deliverOutbox(fake)).on).toBe(false);
+    expect(sent).toHaveLength(0);
+    expect((await ty.req("PUT", "/api/proof-settings", { email_from_address: "not-an-email" })).status).toBe(400);
+    await ty.req("PUT", "/api/proof-settings", { email_sending: "1", email_reply_to: "orders@dirtygraphix.com" });
+    const r = await deliverOutbox(fake, 3);
+    expect(r).toMatchObject({ on: true, sent: 3, failed: 0 });
+    expect(sent[0]).toMatchObject({ from: { name: "Dirty Graphix", email: "orders@dirtygraphix.com" }, replyTo: "orders@dirtygraphix.com" });
+    expect(sent[0].html).toContain("<!doctype html>");
+    const counts = await env.DB.prepare("SELECT status, COUNT(*) AS n FROM outbox GROUP BY status").all<{ status: string; n: number }>();
+    expect(counts.results.find((x) => x.status === "sent")?.n).toBe(3);
+    // A failure is kept and retried later, not lost.
+    const broken = { DB: env.DB, EMAIL: { send: async () => { throw new Error("domain not verified"); } } as unknown as SendEmail };
+    expect((await deliverOutbox(broken, 1)).failed).toBe(1);
+    const row = await env.DB.prepare("SELECT status, attempts, error FROM outbox WHERE error IS NOT NULL").first<Json>();
+    expect(row).toMatchObject({ status: "pending", attempts: 1, error: "domain not verified" });
+    await ty.req("PUT", "/api/proof-settings", { email_sending: "0", email_reply_to: "" });
+  });
+
+  it("previews any email with sample details for TY only", async () => {
+    const template = { subject: "Hi {first_name}", heading: "Ready", body: "For {machines}", button: "Go" };
+    expect((await alissa.req("POST", "/api/proof-settings/preview", { kind: "proof_ready", template })).status).toBe(403);
+    const p = await ty.req("POST", "/api/proof-settings/preview", { kind: "proof_ready", template });
+    expect(p.json.subject).toBe("Hi Rick");
+    expect(p.json.html).toContain("For CAT 250 and JCB 4TS-8T");
   });
 });
