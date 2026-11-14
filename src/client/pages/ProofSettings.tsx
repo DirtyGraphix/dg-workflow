@@ -122,6 +122,7 @@ const WORDING: [string, string][] = [
   ["text_partial_message", "Partly approved: message"],
   ["text_waiting_title", "Before the first proof: page title"],
   ["text_waiting_message", "Before the first proof: message"],
+  ["text_locked_message", "After approval: note at the bottom of the page"],
   ["text_store_button", '"Go to store" button (leave empty to hide)'],
 ];
 

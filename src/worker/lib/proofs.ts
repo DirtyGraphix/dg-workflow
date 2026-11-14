@@ -322,10 +322,13 @@ async function emailCustomer(
   const settings = opts.settings ?? (await getSettings(env.DB));
   const token = await ensureProofToken(env.DB, order);
   const designer = (await personName(env.DB, order.assigned_to)) ?? "Our design team";
+  const current = await getOrder(env.DB, order.id);
   return queueEmail(env.DB, settings, {
     orderId: order.id,
     to: order.customer_email,
     kind,
+    // After approval the page can't take replies, so a message's button just opens the design.
+    buttonLabel: (kind === "reply" || kind === "message") && isLocked(current.stage) ? "View your design" : undefined,
     url: proofLink(settings, opts.origin, token),
     sentBy: opts.sentBy,
     vars: {
@@ -522,8 +525,13 @@ export interface CustomerProof {
   changes: { body: string; at: string } | null;
 }
 
+/** Approved, with production or cancelled: the customer can look but no longer write in. */
+export const isLocked = (stage: Stage) => stage === "approved" || stage === "handed_off" || stage === "cancelled";
+
 export interface CustomerView {
   token: string;
+  /** The design is approved (or the order is closed), so the page is read-only. */
+  locked: boolean;
   orderNumber: string;
   firstName: string;
   designer: string;
@@ -612,6 +620,7 @@ export async function customerView(env: Env, token: string, opts: { trackView: b
     designer,
     stage: order.stage,
     closed,
+    locked: isLocked(order.stage),
     viewOnly,
     customerFirstName: firstName(order.customer_name),
     proofs: shown.map((p) => ({ ...toView(p), canUndo: !viewOnly && toView(p).canUndo })),
@@ -725,6 +734,8 @@ export async function customerMessage(env: Env, token: string, input: { body: st
   const db = env.DB;
   const order = await orderByToken(db, token);
   if (order.stage === "cancelled") throw new WorkflowError("This order was cancelled. Give us a call.", 409);
+  // Once the design is approved it's locked in: no more messages, questions or last-minute changes from this page.
+  if (isLocked(order.stage)) throw new WorkflowError("Your design is approved and locked in for production, so messages can't be sent from this page.", 409);
   const settings = await getSettings(db);
   const body = checkComment(input.body, settings, false);
   if (!body && !input.files.length) throw new WorkflowError("Write a message or attach a file");

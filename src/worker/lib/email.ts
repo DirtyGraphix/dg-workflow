@@ -69,7 +69,7 @@ export function machineList(names: string[]): string {
 export async function queueEmail(
   db: D1Database,
   settings: Record<string, string>,
-  e: { orderId: number; to: string | null; kind: EmailKind; vars: EmailVars; url: string; sentBy?: number | null },
+  e: { orderId: number; to: string | null; kind: EmailKind; vars: EmailVars; url: string; sentBy?: number | null; buttonLabel?: string },
 ): Promise<boolean> {
   const t = readTemplate(settings, e.kind);
   if (!t?.on || !e.to) return false;
@@ -78,7 +78,7 @@ export async function queueEmail(
     subject: fill(t.subject, e.vars),
     heading: fill(t.heading, e.vars),
     body: fill(t.body, e.vars),
-    button_label: fill(t.button, e.vars),
+    button_label: e.buttonLabel ?? fill(t.button, e.vars),
     button_url: e.url,
     order_number: e.vars.order_number,
     first_name: e.vars.first_name,

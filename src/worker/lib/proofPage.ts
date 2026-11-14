@@ -173,7 +173,7 @@ ${m.files.length ? `<div class="pp-files">${m.files.map((f) => `<a href="${fileU
     : "";
 
   const messageForm =
-    !open.length && !v.closed && !v.viewOnly
+    !open.length && !v.locked && !v.viewOnly
       ? `<form class="pp-form" method="post" action="${action("message")}" enctype="multipart/form-data" data-once>
 <h2 class="pp-h2">Send ${esc(v.designer)} a message</h2>
 <label class="pp-label" for="msg">Questions, logo files, answers: it all goes straight to your designer.</label>
@@ -207,7 +207,13 @@ ${history}
 ${thread}
 ${messageForm}
 <footer class="pp-foot">
-<p>${v.viewOnly ? `Questions about the design? Ask ${esc(v.customerFirstName)}, who's working with ${esc(v.designer)} on it.` : "Questions? Use the box above. It goes straight to your designer. Replies to our emails aren’t monitored."}</p>
+<p>${
+    v.viewOnly
+      ? `Questions about the design? Ask ${esc(v.customerFirstName)}, who's working with ${esc(v.designer)} on it.`
+      : v.locked && !open.length
+        ? esc(t("text_locked_message", "Your design is approved and locked in for production. Changes and messages can't be sent after approval."))
+        : "Questions? Use the box above. It goes straight to your designer. Replies to our emails aren’t monitored."
+  }</p>
 ${store}
 </footer>
 </main>

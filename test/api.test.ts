@@ -691,3 +691,31 @@ describe("extra people on an order (view only)", () => {
     expect((await customerGet(new URL(customerLink).pathname)).status).toBe(200);
   });
 });
+
+describe("locking the customer page after approval", () => {
+  it("removes messaging once the design is approved and refuses messages sent anyway", async () => {
+    await sendWebhook("orders/create", sampleShopifyOrder({ id: 5550050, name: "514860050" }));
+    const id = (await cierra.req("GET", "/api/assign")).json.unassigned.find((u: Json) => u.order.orderNumber === "514860050").order.id;
+    await cierra.req("POST", `/api/orders/${id}/assign`, { personId: alissaId });
+    const ms = (await alissa.req("GET", `/api/orders/${id}`)).json.machines.map((m: Json) => m.id);
+    const sent = await sendProofAs(alissa, id, ms, "");
+    const t = new URL(sent.json.customerLink).pathname;
+    expect((await customerPost(`${t}/approve`, { proof: String(sent.json.proofs[0].id) })).status).toBe(303);
+    expect((await alissa.req("GET", `/api/orders/${id}`)).json.stage).toBe("approved");
+
+    const page = await (await customerGet(t)).text();
+    expect(page).toContain("approved and locked in for production");
+    expect(page).not.toContain(`${t}/message`);
+    expect(page).not.toContain("Use the box above");
+
+    const tried = await customerPost(`${t}/message`, { body: "Actually can you make the logo bigger?" });
+    expect(tried.status).toBe(400);
+    expect(await tried.text()).toContain("locked in for production");
+    expect((await alissa.req("GET", `/api/orders/${id}`)).json.messages).toEqual([]);
+
+    // A note from the designer after approval doesn't invite a reply.
+    await alissa.req("POST", `/api/orders/${id}/messages`, { body: "Your kit is headed to production." });
+    const last = await env.DB.prepare("SELECT payload_json FROM outbox WHERE order_id = ? ORDER BY id DESC LIMIT 1").bind(id).first<{ payload_json: string }>();
+    expect(JSON.parse(last!.payload_json).button_label).toBe("View your design");
+  });
+});
