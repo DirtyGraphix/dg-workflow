@@ -28,11 +28,13 @@
   "rules": [{ "type": "Text", "globs": ["**/*.css"], "fallthrough": true }],
   // Hourly job: proof reminders and email delivery.
   "triggers": { "crons": ["0 * * * *"] },
+  // Keeps request and error logs in the Cloudflare dashboard (Observability), so problems can be traced.
+  "observability": { "enabled": true },
   "vars": {
     "SHOP_TIMEZONE": "America/Chicago",
     "SHOPIFY_SHOP_DOMAIN": "dirtygraphix.myshopify.com",
-    // This app's web address, filled in at go-live. Reminder emails sent by the hourly job link from it.
-    "APP_ORIGIN": ""
+    // This app's web address. Reminder emails sent by the hourly job link from it.
+    "APP_ORIGIN": "https://dg-workflow.ty-b26.workers.dev"
   }
   // Secrets (set with `wrangler secret put`, never committed):
   //   SHOPIFY_WEBHOOK_SECRET  verifies that order webhooks really came from Shopify
