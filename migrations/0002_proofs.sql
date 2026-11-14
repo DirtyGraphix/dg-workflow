@@ -88,6 +88,9 @@ CREATE TABLE outbox (
 CREATE INDEX outbox_status ON outbox(status, created_at);
 CREATE INDEX outbox_order ON outbox(order_id, kind, created_at);
 
+-- Intake for the new product page (product-page-v2): priced option lines that are part of the kit's design.
+INSERT INTO settings (key, value) VALUES ('design_option_patterns', 'model options');
+
 -- Defaults copy TY's Approve Pro settings, except where the workflow spec says otherwise.
 INSERT INTO settings (key, value) VALUES
   -- Approval page

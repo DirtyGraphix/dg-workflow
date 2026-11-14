@@ -114,6 +114,7 @@ export async function intakeSettings(db: D1Database): Promise<IntakeSettings> {
     sheetzPatterns: listSetting(s.design_sheetz_patterns),
     otherDesignPatterns: listSetting(s.design_other_patterns),
     matchingPatterns: listSetting(s.design_matching_patterns),
+    optionPatterns: listSetting(s.design_option_patterns ?? "model options"),
   };
 }
 
