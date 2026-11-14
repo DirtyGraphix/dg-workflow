@@ -38,8 +38,30 @@ import {
   signChecklist,
   updateFromShopify,
   WorkflowError,
+  getSettings,
   type OrderRow,
 } from "./lib/orders";
+import { deliverOutbox, EMAIL_KINDS, EMAIL_LABELS } from "./lib/email";
+import {
+  customerApprove,
+  customerMessage,
+  customerRequestChanges,
+  customerUndo,
+  customerView,
+  fileForCustomer,
+  fileResponse,
+  markRead,
+  proofLink,
+  proofsForStaff,
+  runReminders,
+  sendProof,
+  sendReminder,
+  staffMessage,
+  withdrawProof,
+  ensureProofToken,
+  type FileRow,
+} from "./lib/proofs";
+import { renderNotFound, renderProofPage } from "./lib/proofPage";
 
 type AppEnv = { Bindings: Env; Variables: { person: Person } };
 const app = new Hono<AppEnv>();
@@ -71,6 +93,103 @@ app.post("/webhooks/shopify", async (c) => {
     return c.json({ id });
   }
   return c.json({ ignored: topic });
+});
+
+// ---------- customer proof page ----------
+// The link in the customer's email. Also works at dirtygraphix.com/apps/proof/... through a Shopify app proxy,
+// which adds a path_prefix query parameter to every request it forwards.
+
+const origin = (c: Context<AppEnv>) => new URL(c.req.url).origin;
+function proofBase(c: Context<AppEnv>) {
+  const prefix = c.req.query("path_prefix");
+  return prefix && /^\/(apps|a|community|tools)\/[\w-]+$/.test(prefix) ? prefix : "/proof";
+}
+
+async function staffSession(c: Context<AppEnv>): Promise<Person | null> {
+  const token = getCookie(c, SESSION_COOKIE);
+  if (!token) return null;
+  return c.env.DB.prepare(
+    `SELECT p.id, p.name, p.email, p.role, p.takes_orders FROM sessions s JOIN people p ON p.id = s.person_id
+     WHERE s.token_hash = ? AND s.expires_at > ? AND p.active = 1`,
+  )
+    .bind(await sha256(token), new Date().toISOString())
+    .first<Person>();
+}
+
+const pageHeaders = { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" };
+
+async function showProofPage(c: Context<AppEnv>, extra: { error?: string; draft?: { proofId?: number; comment?: string; body?: string } } = {}, status = 200) {
+  const token = c.req.param("token")!;
+  try {
+    // Staff opening the customer link don't count as the customer viewing it.
+    const view = await customerView(c.env, token, { trackView: !extra.error && !(await staffSession(c)) });
+    const html = renderProofPage(view, { base: proofBase(c), origin: origin(c), done: c.req.query("done") ?? null, ...extra });
+    return c.body(html, status as 200, pageHeaders);
+  } catch (e) {
+    if (e instanceof WorkflowError && e.status === 404) return c.body(renderNotFound(origin(c)), 404, pageHeaders);
+    throw e;
+  }
+}
+
+const formFiles = (fd: FormData) => fd.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
+
+async function customerAction(c: Context<AppEnv>, run: (fd: FormData, token: string) => Promise<string>) {
+  const token = c.req.param("token")!;
+  const fd = await c.req.formData();
+  try {
+    const done = await run(fd, token);
+    c.executionCtx.waitUntil(deliverOutbox(c.env).catch(() => undefined));
+    return c.redirect(`${proofBase(c)}/${token}?done=${done}`, 303);
+  } catch (e) {
+    if (!(e instanceof WorkflowError) || e.status === 404) throw e;
+    return showProofPage(c, { error: e.message, draft: { proofId: Number(fd.get("proof")) || undefined, comment: String(fd.get("comment") ?? ""), body: String(fd.get("body") ?? "") } }, 400);
+  }
+}
+
+app.get("/proof/:token", (c) => showProofPage(c));
+
+app.post("/proof/:token/approve", (c) =>
+  customerAction(c, async (fd, token) => {
+    const settings = await getSettings(c.env.DB);
+    const items = (settings.proof_ack_items ?? "").split("\n").filter((x) => x.trim()).length;
+    await customerApprove(c.env, token, Number(fd.get("proof")), {
+      comment: String(fd.get("comment") ?? ""),
+      acknowledged: fd.getAll("ack").length >= items,
+      origin: origin(c),
+    });
+    return "approved";
+  }),
+);
+
+app.post("/proof/:token/undo", (c) =>
+  customerAction(c, async (fd, token) => {
+    await customerUndo(c.env, token, Number(fd.get("proof")));
+    return "undone";
+  }),
+);
+
+app.post("/proof/:token/changes", (c) =>
+  customerAction(c, async (fd, token) => {
+    await customerRequestChanges(c.env, token, Number(fd.get("proof")), { comment: String(fd.get("comment") ?? ""), files: formFiles(fd), origin: origin(c) });
+    return "changes";
+  }),
+);
+
+app.post("/proof/:token/message", (c) =>
+  customerAction(c, async (fd, token) => {
+    await customerMessage(c.env, token, { body: String(fd.get("body") ?? ""), files: formFiles(fd) });
+    return "message";
+  }),
+);
+
+app.get("/proof/:token/file/:id", async (c) => {
+  try {
+    const f = await fileForCustomer(c.env, c.req.param("token"), Number(c.req.param("id")));
+    return fileResponse(c.env, f, c.req.query("download") === "1");
+  } catch (e) {
+    if (e instanceof WorkflowError) return c.text("File not found", 404);
+    throw e;
+  }
 });
 
 // ---------- logins ----------
@@ -243,33 +362,110 @@ async function loadForWork(c: Context<AppEnv>) {
   return o;
 }
 
+/** The order plus its proofs, conversation and the customer's link. Opening it as the designer marks customer messages read. */
+async function fullOrder(c: Context<AppEnv>, id = idParam(c)) {
+  const [detail, proofs, settings, row] = await Promise.all([
+    orderDetail(c.env, id),
+    proofsForStaff(c.env.DB, id),
+    getSettings(c.env.DB),
+    c.env.DB.prepare("SELECT proof_token, customer_unread FROM orders WHERE id = ?").bind(id).first<{ proof_token: string | null; customer_unread: number }>(),
+  ]);
+  return {
+    ...detail,
+    ...proofs,
+    customerUnread: !!row?.customer_unread,
+    customerLink: row?.proof_token ? proofLink(settings, origin(c), row.proof_token) : null,
+  };
+}
+
+const deliverLater = (c: Context<AppEnv>) => c.executionCtx.waitUntil(deliverOutbox(c.env).catch(() => undefined));
+
 api.get("/orders/:id", async (c) => {
+  const o = await loadForWork(c);
+  const full = await fullOrder(c);
+  if (o.assigned_to === c.get("person").id && o.customer_unread) await markRead(c.env.DB, o.id);
+  return c.json(full);
+});
+
+// Sends a proof to the customer: one sheet for the machines picked, with an optional note.
+api.post("/orders/:id/proofs", async (c) => {
   await loadForWork(c);
-  return c.json(await orderDetail(c.env, idParam(c)));
+  const fd = await c.req.formData();
+  await sendProof(c.env, idParam(c), c.get("person"), {
+    machineIds: fd.getAll("machineIds").map(Number).filter(Boolean),
+    message: String(fd.get("message") ?? ""),
+    files: formFiles(fd),
+    origin: origin(c),
+  });
+  deliverLater(c);
+  return c.json(await fullOrder(c), 201);
+});
+
+api.post("/orders/:id/proofs/:proofId/withdraw", async (c) => {
+  await loadForWork(c);
+  await withdrawProof(c.env, idParam(c), Number(c.req.param("proofId")), c.get("person"));
+  return c.json(await fullOrder(c));
+});
+
+api.post("/orders/:id/messages", async (c) => {
+  await loadForWork(c);
+  const { body } = await c.req.json<{ body: string }>();
+  const result = await staffMessage(c.env, idParam(c), c.get("person"), body, origin(c));
+  deliverLater(c);
+  return c.json({ ...result, order: await fullOrder(c) });
+});
+
+api.post("/orders/:id/reminder", async (c) => {
+  await loadForWork(c);
+  await sendReminder(c.env, idParam(c), c.get("person"), origin(c));
+  deliverLater(c);
+  return c.json(await fullOrder(c));
+});
+
+// The customer link, made on demand so it can be copied before the first proof goes out.
+api.post("/orders/:id/customer-link", async (c) => {
+  const o = await loadForWork(c);
+  const token = await ensureProofToken(c.env.DB, o);
+  return c.json({ link: proofLink(await getSettings(c.env.DB), origin(c), token) });
+});
+
+api.get("/files/:id", async (c) => {
+  const f = await c.env.DB.prepare("SELECT * FROM files WHERE id = ?").bind(idParam(c)).first<FileRow>();
+  if (!f) return c.json({ error: "File not found" }, 404);
+  const o = await c.env.DB.prepare("SELECT assigned_to FROM orders WHERE id = ?").bind(f.order_id).first<{ assigned_to: number | null }>();
+  const me = c.get("person");
+  if (!(canSeeAllDesign(me) || canAssign(me) || o?.assigned_to === me.id)) return forbid(c);
+  return fileResponse(c.env, f, c.req.query("download") === "1");
 });
 
 api.post("/orders/:id/proof-sent", async (c) => {
   const b = await c.req.json<{ via?: "approve_pro" | "proof_page"; note?: string }>().catch(() => ({}) as { via?: "approve_pro" | "proof_page"; note?: string });
   await recordProofSent(c.env.DB, idParam(c), c.get("person"), { via: b.via ?? "approve_pro", note: b.note });
-  return c.json(await orderDetail(c.env, idParam(c)));
+  return c.json(await fullOrder(c));
 });
 
 api.post("/orders/:id/approve", async (c) => {
   const b = await c.req.json<{ machineIds?: number[]; method: (typeof APPROVAL_METHODS)[number]; note: string }>();
   await recordApproval(c.env.DB, idParam(c), c.get("person"), b);
-  return c.json(await orderDetail(c.env, idParam(c)));
+  // A proof whose machines are now all approved is approved too.
+  await c.env.DB.prepare(
+    `UPDATE proofs SET status = 'approved', decided_at = ? WHERE order_id = ? AND status = 'open'
+     AND NOT EXISTS (SELECT 1 FROM proof_machines pm JOIN machines m ON m.id = pm.machine_id WHERE pm.proof_id = proofs.id AND m.approved_at IS NULL)`,
+  ).bind(new Date().toISOString(), idParam(c)).run();
+  return c.json(await fullOrder(c));
 });
 
 api.post("/orders/:id/request-changes", async (c) => {
   const b = await c.req.json<{ method: (typeof APPROVAL_METHODS)[number]; note: string }>();
   await recordRevisionRequest(c.env.DB, idParam(c), c.get("person"), b);
-  return c.json(await orderDetail(c.env, idParam(c)));
+  await c.env.DB.prepare("UPDATE proofs SET status = 'changes_requested', decided_at = ? WHERE order_id = ? AND status = 'open'").bind(new Date().toISOString(), idParam(c)).run();
+  return c.json(await fullOrder(c));
 });
 
 api.post("/orders/:id/checklist", async (c) => {
   const { itemIds } = await c.req.json<{ itemIds: number[] }>();
   await signChecklist(c.env.DB, idParam(c), c.get("person"), itemIds ?? []);
-  return c.json(await orderDetail(c.env, idParam(c)));
+  return c.json(await fullOrder(c));
 });
 
 api.put("/machines/:id/length", async (c) => {
@@ -281,30 +477,30 @@ api.put("/machines/:id/length", async (c) => {
 api.post("/orders/:id/hand-off", async (c) => {
   const b = await c.req.json<{ machineIds?: number[]; productionNote?: string }>();
   const result = await handOff(c.env.DB, idParam(c), c.get("person"), b);
-  return c.json({ ...result, order: await orderDetail(c.env, idParam(c)) });
+  return c.json({ ...result, order: await fullOrder(c) });
 });
 
 api.post("/orders/:id/rush", async (c) => {
   const b = await c.req.json<{ note: string; customerPaying: boolean }>();
   await markRush(c.env.DB, idParam(c), c.get("person"), b);
-  return c.json(await orderDetail(c.env, idParam(c)));
+  return c.json(await fullOrder(c));
 });
 
 api.post("/orders/:id/custom", async (c) => {
   const b = await c.req.json<{ note: string }>();
   await markCustom(c.env.DB, idParam(c), c.get("person"), b);
-  return c.json(await orderDetail(c.env, idParam(c)));
+  return c.json(await fullOrder(c));
 });
 
 api.post("/orders/:id/print-file/pause", async (c) => {
   const { reason } = await c.req.json<{ reason: string }>();
   await pausePrintFile(c.env.DB, idParam(c), c.get("person"), reason);
-  return c.json(await orderDetail(c.env, idParam(c)));
+  return c.json(await fullOrder(c));
 });
 
 api.post("/orders/:id/print-file/resume", async (c) => {
   await resumePrintFile(c.env.DB, idParam(c), c.get("person"), await clockFor(c.env));
-  return c.json(await orderDetail(c.env, idParam(c)));
+  return c.json(await fullOrder(c));
 });
 
 // Orders that didn't come through Shopify: samples, warranty work, other sales systems.
@@ -315,6 +511,74 @@ api.post("/orders/manual", async (c) => {
   return c.json({ id }, 201);
 });
 
+// ---------- proof settings (TY) and reply templates ----------
+
+const SETTING_PREFIXES = ["proof_", "text_", "reminder_", "email_"];
+const isProofSetting = (k: string) => SETTING_PREFIXES.some((p) => k.startsWith(p));
+
+api.get("/proof-settings", async (c) => {
+  if (c.get("person").role !== "admin") return forbid(c);
+  const all = await getSettings(c.env.DB);
+  const { results: outbox } = await c.env.DB.prepare(
+    `SELECT x.id, x.kind, x.to_email AS toEmail, x.status, x.created_at AS createdAt, x.sent_at AS sentAt, x.error, o.order_number AS orderNumber, p.name AS sentBy, x.payload_json
+     FROM outbox x LEFT JOIN orders o ON o.id = x.order_id LEFT JOIN people p ON p.id = x.sent_by ORDER BY x.id DESC LIMIT 30`,
+  ).all<Record<string, unknown> & { payload_json: string }>();
+  return c.json({
+    settings: Object.fromEntries(Object.entries(all).filter(([k]) => isProofSetting(k))),
+    emails: EMAIL_KINDS.map((k) => ({ kind: k, ...EMAIL_LABELS[k] })),
+    klaviyoConnected: !!c.env.KLAVIYO_PRIVATE_KEY,
+    appOrigin: c.env.APP_ORIGIN ?? null,
+    outbox: outbox.map(({ payload_json, ...r }) => ({ ...r, subject: JSON.parse(payload_json).subject as string })),
+  });
+});
+
+api.put("/proof-settings", async (c) => {
+  if (c.get("person").role !== "admin") return forbid(c);
+  const body = await c.req.json<Record<string, string>>();
+  const stmts: D1PreparedStatement[] = [];
+  for (const [k, v] of Object.entries(body)) {
+    if (!isProofSetting(k) || typeof v !== "string") return c.json({ error: `Unknown setting: ${k}` }, 400);
+    if (k.startsWith("email_") && k !== "email_bcc") {
+      try {
+        const t = JSON.parse(v);
+        if (typeof t.on !== "boolean" || ![t.subject, t.heading, t.body, t.button].every((x) => typeof x === "string" && x.trim())) throw new Error();
+      } catch {
+        return c.json({ error: "Each email needs a subject, heading, message and button label" }, 400);
+      }
+    }
+    if (k === "proof_link_base" && v.trim() && !/^https:\/\/[^\s]+$/.test(v.trim())) return c.json({ error: "The link address has to start with https://" }, 400);
+    stmts.push(c.env.DB.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(k, v));
+  }
+  if (stmts.length) await c.env.DB.batch(stmts);
+  return c.json({ ok: true });
+});
+
+const canEditTemplates = (p: Person) => p.role === "admin" || p.role === "lead";
+
+api.get("/reply-templates", async (c) => {
+  const { results } = await c.env.DB.prepare("SELECT id, name, body FROM reply_templates WHERE active = 1 ORDER BY name").all();
+  return c.json(results);
+});
+
+api.post("/reply-templates", async (c) => {
+  const me = c.get("person");
+  if (!canEditTemplates(me)) return forbid(c);
+  const b = await c.req.json<{ name: string; body: string }>();
+  if (!b.name?.trim() || !b.body?.trim()) return c.json({ error: "Give the template a name and some text" }, 400);
+  const row = await c.env.DB.prepare("INSERT INTO reply_templates (name, body, created_by) VALUES (?, ?, ?) RETURNING id").bind(b.name.trim(), b.body.trim(), me.id).first<{ id: number }>();
+  return c.json({ id: row!.id }, 201);
+});
+
+api.patch("/reply-templates/:id", async (c) => {
+  if (!canEditTemplates(c.get("person"))) return forbid(c);
+  const b = await c.req.json<{ name?: string; body?: string; active?: boolean }>();
+  if ((b.name !== undefined && !b.name.trim()) || (b.body !== undefined && !b.body.trim())) return c.json({ error: "Name and text can't be empty" }, 400);
+  await c.env.DB.prepare("UPDATE reply_templates SET name = COALESCE(?, name), body = COALESCE(?, body), active = COALESCE(?, active) WHERE id = ?")
+    .bind(b.name?.trim() ?? null, b.body?.trim() ?? null, b.active === undefined ? null : b.active ? 1 : 0, idParam(c))
+    .run();
+  return c.json({ ok: true });
+});
+
 api.get("/meta", (c) => c.json({ finishes: FINISHES, approvalMethods: APPROVAL_METHODS, roles: ROLES }));
 
 app.route("/api", api);
@@ -322,4 +586,15 @@ app.route("/api", api);
 // Everything else is the React app.
 app.all("*", (c) => c.env.ASSETS.fetch(c.req.raw));
 
-export default app;
+export default {
+  fetch: app.fetch,
+  // Hourly: automatic proof reminders (business hours only), then any emails still waiting to send.
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(
+      (async () => {
+        await runReminders(env);
+        await deliverOutbox(env, 200);
+      })(),
+    );
+  },
+} satisfies ExportedHandler<Env>;

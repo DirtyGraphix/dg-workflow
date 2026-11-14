@@ -6,6 +6,7 @@ import { DesignQueue } from "./pages/DesignQueue";
 import { Assign } from "./pages/Assign";
 import { People } from "./pages/People";
 import { ManualJob } from "./pages/ManualJob";
+import { ProofSettings } from "./pages/ProofSettings";
 
 const home = (me: Me) => (me.role === "billing" ? "/assign" : "/design");
 
@@ -42,6 +43,7 @@ export function App() {
       <Route path="/design" element={<DesignQueue me={me} />} />
       <Route path="/assign" element={<Assign me={me} />} />
       <Route path="/people" element={me.role === "admin" ? <People me={me} /> : <Navigate to={home(me)} replace />} />
+      <Route path="/settings/proofs" element={me.role === "admin" ? <ProofSettings me={me} /> : <Navigate to={home(me)} replace />} />
       <Route path="/jobs/new" element={<ManualJob me={me} />} />
       <Route path="*" element={<Navigate to={home(me)} replace />} />
     </Routes>

@@ -2,6 +2,7 @@
 // Run `npm run dev` in one terminal, then `npm run seed:dev` in another.
 // Never point this at the live app.
 import { createHmac } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:8787";
 const SECRET = process.env.SHOPIFY_WEBHOOK_SECRET ?? "local-dev-secret";
@@ -108,13 +109,52 @@ const cierra = clients.Cierra;
 const alissa = clients.Alissa;
 for (const n of [4820, 4826, 4825, 4818, 4814]) await cierra.req("POST", `/api/orders/${orderIds[n]}/assign`, { personId: ids.Alissa });
 
-await alissa.req("POST", `/api/orders/${orderIds[4818]}/proof-sent`, { via: "approve_pro" });
-await alissa.req("POST", `/api/orders/${orderIds[4818]}/request-changes`, { method: "phone", note: "Move the logo higher on the cab door" });
-await alissa.req("POST", `/api/orders/${orderIds[4814]}/proof-sent`, { via: "approve_pro" });
-await alissa.req("POST", `/api/orders/${orderIds[4820]}/proof-sent`, { via: "approve_pro" });
-await alissa.req("POST", `/api/orders/${orderIds[4820]}/request-changes`, { method: "phone", note: "Wants the company name bigger" });
-await alissa.req("POST", `/api/orders/${orderIds[4820]}/proof-sent`, { via: "approve_pro" });
-await alissa.req("POST", `/api/orders/${orderIds[4820]}/approve`, { method: "approve_pro", note: "Approved both machines in Approve Pro" });
+// Proofs go out through the new proof page. The images are made-up samples in scripts/sample-proofs.
+const sampleProof = (name) => new File([readFileSync(new URL(`./sample-proofs/${name}`, import.meta.url))], name, { type: "image/png" });
+async function sendProof(client, orderId, machineIds, file, message = "") {
+  const fd = new FormData();
+  machineIds.forEach((id) => fd.append("machineIds", String(id)));
+  fd.append("message", message);
+  fd.append("files", file);
+  const res = await fetch(`${BASE}/api/orders/${orderId}/proofs`, { method: "POST", headers: { cookie: client.cookie }, body: fd });
+  if (!res.ok) throw new Error(`send proof → ${res.status} ${await res.text()}`);
+  return res.json();
+}
+// What the customer's browser does on the proof page.
+async function customer(link, action, fields) {
+  const fd = new FormData();
+  for (const [k, v] of Object.entries(fields)) fd.append(k, v);
+  const res = await fetch(`${link}/${action}`, { method: "POST", body: fd, redirect: "manual" });
+  if (res.status !== 303) throw new Error(`customer ${action} → ${res.status}`);
+}
 
+// 4820: split proofs. The customer approved the CAT and asked for changes on the Deere, which is on Revision 1.
+let d = await alissa.req("GET", `/api/orders/${orderIds[4820]}`);
+const [deere, cat] = d.machines.map((m) => m.id);
+await sendProof(alissa, orderIds[4820], [deere], sampleProof("jd-325g.png"), "Hey! Here's the first mockup for your 325G. Let me know what you think.");
+d = await sendProof(alissa, orderIds[4820], [cat], sampleProof("cat-259d3.png"));
+const link4820 = d.customerLink.replace(/^https?:\/\/[^/]+/, BASE);
+await customer(link4820, "changes", { proof: String(d.proofs[0].id), comment: "Can you make the company name bigger on both cab doors?" });
+await customer(link4820, "approve", { proof: String(d.proofs[1].id) });
+await sendProof(alissa, orderIds[4820], [deere], sampleProof("jd-325g.png"), "Made the company name bigger on both doors.");
+
+// 4814: first proof out, waiting on the customer.
+d = await alissa.req("GET", `/api/orders/${orderIds[4814]}`);
+await sendProof(alissa, orderIds[4814], d.machines.map((m) => m.id), sampleProof("cat-308.png"));
+
+// 4818: the customer asked for changes on the proof page.
+d = await alissa.req("GET", `/api/orders/${orderIds[4818]}`);
+d = await sendProof(alissa, orderIds[4818], d.machines.map((m) => m.id), sampleProof("cat-259d3.png"));
+await customer(d.customerLink.replace(/^https?:\/\/[^/]+/, BASE), "changes", { proof: String(d.proofs[0].id), comment: "Move the logo higher on the cab door" });
+
+// 4825: a question before the first proof, and the customer's answer.
+await alissa.req("POST", `/api/orders/${orderIds[4825]}/messages`, { body: "Quick question: what year is your T66? The door shape changed in 2022." });
+const link4825 = (await alissa.req("POST", `/api/orders/${orderIds[4825]}/customer-link`)).link.replace(/^https?:\/\/[^/]+/, BASE);
+await customer(link4825, "message", { body: "It's a 2023." });
+
+await cierra.req("POST", "/api/reply-templates", { name: "First proof", body: "Hey {first_name}, here's your first mockup! Let me know what you think or if anything needs to change.\n\nThanks,\n{designer}" });
+await cierra.req("POST", "/api/reply-templates", { name: "Revision", body: "Hey {first_name}, here's the adjusted mockup with your changes. Let me know if it's good to go!\n\nThanks,\n{designer}" });
+
+console.log(`Customer proof page for order 4820: ${link4820}`);
 console.log(`Seeded. Sign in at ${BASE} with any of these emails and the password "${PASSWORD}":`);
 for (const name of ["TY", ...team.map((t) => t[0])]) console.log(`  ${name.toLowerCase()}@dev.local`);

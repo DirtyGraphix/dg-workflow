@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { api, ApiError, type LengthCheck, type Me, type MachineView, type OrderDetail, type TimelineEvent } from "../api";
 import { Chip, ErrorNote, finishVar, OrderTags } from "../components/ui";
 import { day, dayTime, feet, full, hm, inches, PAYMENT_LABELS, plural, time } from "../format";
+import { ProofSection } from "./ProofSection";
 
 const METHOD_LABELS: Record<string, string> = {
+  proof_page: "On the proof page",
   approve_pro: "In Approve Pro",
   matches_machine: "Uses the approved machine design",
   phone: "Phone call",
@@ -25,14 +27,28 @@ function timelineLabel(e: TimelineEvent, order: OrderDetail, proofIndex: number)
     case "assigned":
     case "reassigned":
       return e.note ?? "Assigned";
-    case "proof_sent":
-      return proofIndex === 0 ? "First proof sent" : `Revision ${proofIndex} sent`;
+    case "proof_sent": {
+      const ids: number[] = e.data?.machineIds ?? [];
+      const which = ids.length && ids.length < order.machines.filter((m) => m.needsProof).length ? ` · ${ids.map(machineName).join(", ")}` : "";
+      const n = e.data?.number ?? proofIndex + 1;
+      return `${n <= 1 ? "First proof sent" : `Revision ${n - 1} sent`}${which}`;
+    }
     case "revision_requested":
-      return "Revision requested";
+      return e.person ? "Revision requested" : "Customer asked for changes";
+    case "approval_undone":
+      return "Customer took back an approval";
+    case "proof_withdrawn":
+      return `Proof taken back by ${e.person ?? "designer"}`;
+    case "message_sent":
+      return `Message to customer from ${e.person ?? "designer"}`;
+    case "customer_message":
+      return "Message from customer";
+    case "reminder_sent":
+      return e.data?.automatic ? "Automatic reminder sent" : `Reminder sent by ${e.person ?? "designer"}`;
     case "approved": {
       const ids: number[] = e.data?.machineIds ?? [];
       const which = e.data?.all && ids.length === order.machines.length ? "" : ` · ${ids.map(machineName).join(", ")}`;
-      return `Customer approved${which}`;
+      return `${e.data?.method === "proof_page" ? "Customer approved on the proof page" : "Customer approved"}${which}`;
     }
     case "checklist_signed":
       return `Checklist signed off by ${e.person ?? "designer"}`;
@@ -61,6 +77,9 @@ const DOTS: Record<string, string> = {
   proof_sent: "var(--stage-first-proof)",
   revision_requested: "var(--stage-revision)",
   approved: "var(--stage-print-file)",
+  approval_undone: "var(--stage-revision)",
+  customer_message: "var(--stage-revision)",
+  reminder_sent: "var(--stage-waiting)",
   handed_off: "var(--text)",
   marked_rush: "var(--stage-rush)",
   print_file_paused: "var(--stage-reprint)",
@@ -73,14 +92,14 @@ function Timeline({ order }: { order: OrderDetail }) {
     <ol className="timeline">
       {order.timeline.map((e) => {
         const idx = e.kind === "proof_sent" ? proofs++ : 0;
-        const method = e.data?.method && e.kind !== "proof_sent" ? ` · ${METHOD_LABELS[e.data.method] ?? e.data.method}` : "";
+        const method = e.data?.method && e.kind !== "proof_sent" && e.data.method !== "proof_page" ? ` · ${METHOD_LABELS[e.data.method] ?? e.data.method}` : "";
         return (
           <li key={e.id}>
             <span aria-hidden="true" className="timeline__dot" style={{ "--dot": DOTS[e.kind] ?? "var(--stage-waiting)" } as CSSProperties} />
             <span>
               <span className="strong">{timelineLabel(e, order, idx)}</span>
               <span className="muted"> · {dayTime(e.at)}{method}</span>
-              {e.note && e.kind !== "assigned" && e.kind !== "reassigned" && e.kind !== "received" && (
+              {e.note && !["assigned", "reassigned", "received", "message_sent", "customer_message"].includes(e.kind) && (
                 <span className="timeline__note">
                   “{e.note}”{e.person ? ` · ${e.person}` : ""}
                 </span>
@@ -149,7 +168,7 @@ function ManualDecision({ order, kind, onDone, onCancel }: { order: OrderDetail;
         <div className="field">
           <label htmlFor="manual-how">How did the customer tell you?</label>
           <select id="manual-how" className="select" value={method} onChange={(e) => setMethod(e.target.value)}>
-            {Object.entries(METHOD_LABELS).map(([k, v]) => (
+            {Object.entries(METHOD_LABELS).filter(([k]) => k !== "proof_page" && k !== "matches_machine").map(([k, v]) => (
               <option key={k} value={k}>
                 {v}
               </option>
@@ -456,6 +475,8 @@ export function OrderPanel({ orderId, me, onChange }: { orderId: number; me: Me;
   const [form, setForm] = useState<FormKind>(null);
   const [contactOpen, setContactOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const reload = useCallback(async () => {
     try {
@@ -483,6 +504,23 @@ export function OrderPanel({ orderId, me, onChange }: { orderId: number; me: Me;
     setForm(f);
     setActionsOpen(false);
   };
+  const run = async (fn: () => Promise<void>) => {
+    setActionError(null);
+    try {
+      await fn();
+    } catch (e) {
+      setActionError(e instanceof ApiError ? e.message : "Couldn't do that");
+    }
+  };
+  const copyLink = () =>
+    run(async () => {
+      const { link } = await api<{ link: string }>("POST", `/orders/${order.id}/customer-link`);
+      await navigator.clipboard?.writeText(link).catch(() => undefined);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+      await reload();
+    });
+  const lastAsk = order.stage === "revision_requested" ? [...order.messages].reverse().find((m) => m.author === "customer" && m.kind === "changes") : null;
 
   const canProof = ["needs_first_proof", "revision_requested", "proof_sent"].includes(order.stage);
   const canDecide = ["proof_sent", "revision_requested", "needs_first_proof", "approved"].includes(order.stage) && order.machines.some((m) => !m.approvedAt && m.needsProof);
@@ -519,13 +557,21 @@ export function OrderPanel({ orderId, me, onChange }: { orderId: number; me: Me;
           )}
           {actionsOpen && (
             <div id="order-actions" className="actions">
-              <div role="group" aria-label="Proofs" className="actions__group">
+              <div role="group" aria-label="Ask the customer" className="actions__group">
                 <span className="actions__label" style={{ color: "var(--link)" }}>
-                  Proofs
+                  Ask the customer
                 </span>
-                <button type="button" className="btn" disabled={!canProof} onClick={() => post("proof-sent", { via: "approve_pro" })}>
-                  {order.stage === "needs_first_proof" ? "First proof sent in Approve Pro" : "Revision sent in Approve Pro"}
+                <button type="button" className="btn" disabled={!order.proofs.some((p) => p.status === "open") || !order.customer.email} onClick={() => run(() => post("reminder"))}>
+                  Send reminder
                 </button>
+                <button type="button" className="btn" onClick={copyLink}>
+                  {copied ? "Link copied" : "Copy customer link"}
+                </button>
+                {order.inApprovePro && (
+                  <button type="button" className="btn" disabled={!canProof} onClick={() => run(() => post("proof-sent", { via: "approve_pro" }))}>
+                    {order.stage === "needs_first_proof" ? "First proof sent in Approve Pro" : "Revision sent in Approve Pro"}
+                  </button>
+                )}
               </div>
               <div role="group" aria-label="Customer told you directly" className="actions__group">
                 <span className="actions__label" style={{ color: "var(--success)" }}>
@@ -563,6 +609,16 @@ export function OrderPanel({ orderId, me, onChange }: { orderId: number; me: Me;
                     </button>
                   ))}
               </div>
+            </div>
+          )}
+          <ErrorNote error={actionError} />
+          {lastAsk && (
+            <div className="customer-ask" role="note">
+              <span className="small strong" style={{ color: "var(--brand-ink)" }}>
+                Customer asked for changes · {dayTime(lastAsk.createdAt)}
+                {lastAsk.files.length ? ` · ${plural(lastAsk.files.length, "file")} attached` : ""}
+              </span>
+              <span style={{ fontSize: 16 }}>“{lastAsk.body}”</span>
             </div>
           )}
           {(form === "approve" || form === "reject") && <ManualDecision order={order} kind={form} onDone={done} onCancel={() => setForm(null)} />}
@@ -684,6 +740,15 @@ export function OrderPanel({ orderId, me, onChange }: { orderId: number; me: Me;
           <Timeline order={order} />
         </div>
       </div>
+
+      <ProofSection
+        order={order}
+        me={me}
+        onOrder={(o) => {
+          setOrder(o);
+          onChange();
+        }}
+      />
 
       <div className="stack">
         <h3 className="section-label">Machines on this order · from the customizer</h3>
