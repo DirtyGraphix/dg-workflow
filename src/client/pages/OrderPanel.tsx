@@ -477,7 +477,7 @@ function HandOff({ order, me, reload, onChange }: { order: OrderDetail; me: Me; 
 
 // ---------- panel ----------
 
-export function OrderPanel({ orderId, me, onChange }: { orderId: number; me: Me; onChange: () => void }) {
+export function OrderPanel({ orderId, me, onChange, refreshTick = 0 }: { orderId: number; me: Me; onChange: () => void; refreshTick?: number }) {
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [form, setForm] = useState<FormKind>(null);
@@ -497,6 +497,11 @@ export function OrderPanel({ orderId, me, onChange }: { orderId: number; me: Me;
   useEffect(() => {
     reload();
   }, [reload]);
+
+  // Keep the open order current (customer approvals, changes, messages) without a page reload.
+  useEffect(() => {
+    if (refreshTick) reload();
+  }, [refreshTick, reload]);
 
   if (error && !order) return <section className="panel"><p className="error">{error}</p></section>;
   if (!order) return <section className="panel" aria-busy="true" />;

@@ -1,10 +1,17 @@
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { Link, useSearchParams } from "react-router";
 import { api, type Me, type OrderSummary, type QueueGroup, type QueueResponse } from "../api";
 import { Shell } from "../components/Shell";
 import { Chip, GroupTitle, OrderTags, STAGE_COLORS, StatCard } from "../components/ui";
 import { OrderPanel } from "./OrderPanel";
 import { ago, day, hm, plural } from "../format";
+import { useLiveRefresh } from "../live";
+import { isBusinessHours, playSound, setSoundLevel, soundLevel, soundReady, unlockSound, type SoundLevel } from "../sounds";
+import { changes, snapshot } from "../queueChanges";
+
+const LEVEL_LABEL: Record<SoundLevel, string> = { on: "Sound: On", low: "Sound: Low", off: "Sound: Off" };
+const NEXT_LEVEL: Record<SoundLevel, SoundLevel> = { on: "low", low: "off", off: "on" };
+
 
 function cardMeta(o: OrderSummary, group: QueueGroup["key"]): { text: string; warn: boolean } {
   const late = o.printFileDue && new Date(o.printFileDue) < new Date();
@@ -50,10 +57,23 @@ export function DesignQueue({ me }: { me: Me }) {
   const [queue, setQueue] = useState<QueueResponse | null>(null);
   const as = params.get("person");
   const selected = Number(params.get("order")) || null;
+  const [tick, setTick] = useState(0);
+  const [level, setLevel] = useState<SoundLevel>(soundLevel());
+  const [ready, setReady] = useState(soundReady());
+  const [rushAlert, setRushAlert] = useState<number[]>([]);
+  const last = useRef<Map<number, { group: string; rush: boolean }> | null>(null);
 
-  const load = useCallback(async () => {
+  /** `fromRefresh`: a timed refresh, where changes came from someone else (sounds play only for those). */
+  const load = useCallback(async (fromRefresh = false) => {
     const q = await api<QueueResponse>("GET", `/queue${as ? `?person=${as}` : ""}`);
     setQueue(q);
+    // Sounds only for your own queue, not when the team lead looks at someone else's.
+    if (fromRefresh && !as && last.current) {
+      const { sound, rushIds } = changes(last.current, q);
+      if (sound) playSound(sound);
+      if (rushIds.length) setRushAlert((ids) => [...new Set([...ids, ...rushIds])]);
+    }
+    last.current = snapshot(q);
     // Open the first order only when nothing is selected yet. After a hand-off the finished
     // order stays open so the designer sees it confirmed.
     const first = q.groups.flatMap((g) => g.orders)[0];
@@ -69,8 +89,41 @@ export function DesignQueue({ me }: { me: Me }) {
   }, [as, setParams]);
 
   useEffect(() => {
+    last.current = null;
     load();
   }, [load]);
+
+  useLiveRefresh(() => {
+    load(true);
+    setTick((t) => t + 1);
+  });
+
+  // Rush repeats until someone acknowledges it (business hours only).
+  useEffect(() => {
+    if (!rushAlert.length) return;
+    const timer = setInterval(() => isBusinessHours() && playSound("rush"), 10_000);
+    return () => clearInterval(timer);
+  }, [rushAlert.length]);
+
+  // Browsers allow sound only after a click on the page.
+  useEffect(() => {
+    const unlock = () => unlockSound().then(setReady);
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, []);
+
+  const changeLevel = async () => {
+    const ok = await unlockSound();
+    setReady(ok);
+    const next = ready ? NEXT_LEVEL[level] : level;
+    setLevel(next);
+    setSoundLevel(next);
+    if (next !== "off") playSound("assigned", { always: true });
+  };
 
   const select = (id: number) => setParams((p) => (p.set("order", String(id)), p));
   const s = queue?.stats;
@@ -80,11 +133,40 @@ export function DesignQueue({ me }: { me: Me }) {
       me={me}
       title="Design queue"
       actions={
-        <Link className="app-header__btn" to="/jobs/new">
-          New manual job
-        </Link>
+        <>
+          {!as && (
+            <button type="button" className="app-header__btn" onClick={changeLevel} title="Sounds play for your own orders during business hours">
+              {ready ? LEVEL_LABEL[level] : "Turn on sound"}
+            </button>
+          )}
+          <Link className="app-header__btn" to="/jobs/new">
+            New manual job
+          </Link>
+        </>
       }
     >
+      {rushAlert.length > 0 && (
+        <div className="rush-alert" role="alert">
+          <span className="tag tag--rush">RUSH</span>
+          <span className="strong">
+            {rushAlert.length === 1 ? "A rush order" : `${rushAlert.length} rush orders`} just landed in your queue:{" "}
+            {rushAlert
+              .map((id) => queue?.groups.flatMap((g) => g.orders).find((o) => o.id === id)?.orderNumber)
+              .filter(Boolean)
+              .join(", ")}
+          </span>
+          <button
+            type="button"
+            className="btn btn--dark"
+            onClick={() => {
+              select(rushAlert[0]);
+              setRushAlert([]);
+            }}
+          >
+            Acknowledge
+          </button>
+        </div>
+      )}
       <section aria-label="Your numbers" className="stats">
         <StatCard
           label="Your score"
@@ -117,7 +199,7 @@ export function DesignQueue({ me }: { me: Me }) {
         </nav>
         <div className="split__main">
           {selected ? (
-            <OrderPanel key={selected} orderId={selected} me={me} onChange={load} />
+            <OrderPanel key={selected} orderId={selected} me={me} onChange={() => load()} refreshTick={tick} />
           ) : (
             <section className="panel">
               <p className="muted" style={{ margin: 0 }}>
